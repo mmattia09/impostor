@@ -55,9 +55,21 @@ const PACKS_KEY = 'imp_packs_v4';
 const LEGACY_PACKS_KEY = 'imp_packs_v3';
 const DELETED_DEFAULTS_KEY = 'imp_deleted_defaults';
 const PREFS_KEY = 'imp_prefs';
-const USED_WORDS_KEY = 'imp_used_words';
+const SESSION_KEY = 'imp_session_v1';
+const GAME_KEY = 'imp_game_v1';
 const WORD_CHANGE_KEY = 'imp_word_change_at';
 const WORD_CHANGE_COOLDOWN_MS = 10 * 60 * 1000;
+// Dopo mezza giornata di inattività la serata è finita: si riparte puliti.
+const SESSION_MAX_IDLE_MS = 12 * 60 * 60 * 1000;
+const HISTORY_MAX = 200;
+
+// Punti assegnati a fine round, per ruolo.
+const SCORE_TABLE = {
+  civilians: { civilian: 2 },
+  impostors: { impostor: 3, mrwhiteAlive: 1 },
+  'mrwhite-win': { mrwhite: 4 },
+  'mrwhite-survived': { mrwhite: 4 }
+};
 
 function normalizePacket(p) {
   return { ...p, id: safePacketId(p.id), lines: Array.isArray(p.lines) ? [...p.lines] : [] };
@@ -188,8 +200,14 @@ const ST = {
   secretWordHints: [],
   hintOrder: [],
   usedWords: new Set(),
-  votedOut: null
+  votedOut: null,
+  lastEliminated: null,
+  starterName: '',
+  scored: false,
+  session: null
 };
+
+let currentScreenId = 'home';
 
 // Confronto "morbido": ignora maiuscole, accenti e punteggiatura.
 function normalizeWord(value) {
@@ -210,17 +228,184 @@ function shuffle(arr) {
   return out;
 }
 
-function loadUsedWords() {
+// ---------------------------------------------------------------------------
+// Serata: punteggi, cronologia e parole già uscite. Sta in localStorage, quindi
+// un refresh (anche per sbaglio) o la chiusura della scheda non la perdono.
+// ---------------------------------------------------------------------------
+function newSession() {
+  const now = Date.now();
+  return { startedAt: now, lastActiveAt: now, rounds: 0, usedWords: [], history: [], scores: {} };
+}
+
+function loadSession() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) {}
+  if (!raw || typeof raw !== 'object' || !Number.isFinite(raw.lastActiveAt)
+      || Date.now() - raw.lastActiveAt > SESSION_MAX_IDLE_MS) {
+    ST.session = newSession();
+  } else {
+    ST.session = {
+      startedAt: Number(raw.startedAt) || Date.now(),
+      lastActiveAt: Number(raw.lastActiveAt) || Date.now(),
+      rounds: Number(raw.rounds) || 0,
+      usedWords: Array.isArray(raw.usedWords) ? raw.usedWords.map(String) : [],
+      history: Array.isArray(raw.history)
+        ? raw.history.filter(h => h && typeof h.word === 'string').slice(-HISTORY_MAX)
+        : [],
+      scores: (raw.scores && typeof raw.scores === 'object' && !Array.isArray(raw.scores))
+        ? Object.fromEntries(Object.entries(raw.scores)
+            .filter(([, v]) => Number.isFinite(v))
+            .map(([k, v]) => [String(k), Number(v)]))
+        : {}
+    };
+  }
+  ST.usedWords = new Set(ST.session.usedWords);
+}
+
+function saveSession() {
+  ST.session.lastActiveAt = Date.now();
+  ST.session.usedWords = [...ST.usedWords];
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(ST.session)); } catch (e) {}
+}
+
+function endSession() {
+  const hasData = ST.session.rounds > 0 || ST.session.history.length > 0;
+  if (hasData && !confirm('Terminare la serata? Punteggi, cronologia e parole già uscite vengono azzerati.')) return;
+  ST.session = newSession();
+  ST.usedWords = new Set();
+  clearSavedGame();
+  saveSession();
+  renderSessionCard();
+  renderResumeBanner();
+  toast('Serata azzerata.');
+}
+
+function sessionHasContent() {
+  return ST.session.rounds > 0 || ST.session.history.length > 0
+    || Object.keys(ST.session.scores).length > 0;
+}
+
+function recordWordDrawn(entry) {
+  ST.session.history.push({ word: entry.word, pack: entry.pack || '', at: Date.now(), outcome: null });
+  if (ST.session.history.length > HISTORY_MAX) ST.session.history.shift();
+}
+
+function setLastWordOutcome(outcome) {
+  const last = ST.session.history[ST.session.history.length - 1];
+  if (last && !last.outcome) last.outcome = outcome;
+}
+
+// Assegna i punti del round. Una sola volta: showResult può essere raggiunto
+// da più strade e i punti non devono raddoppiarsi.
+function awardPoints(outcome) {
+  if (ST.scored) return [];
+  ST.scored = true;
+  const rules = SCORE_TABLE[outcome] || {};
+  const gains = [];
+  ST.players.forEach(p => {
+    let pts = 0;
+    if (p.role === 'civilian') pts = rules.civilian || 0;
+    else if (p.role === 'impostor') pts = rules.impostor || 0;
+    else if (p.role === 'mrwhite') pts = (rules.mrwhite || 0) + (p.eliminated ? 0 : (rules.mrwhiteAlive || 0));
+    if (!pts) return;
+    ST.session.scores[p.name] = (ST.session.scores[p.name] || 0) + pts;
+    gains.push({ name: p.name, pts });
+  });
+  ST.session.rounds++;
+  setLastWordOutcome(outcome);
+  saveSession();
+  return gains;
+}
+
+function scoreboardRows() {
+  return Object.entries(ST.session.scores)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name, pts], i) => ({ name, pts, rank: i + 1 }));
+}
+
+// ---------------------------------------------------------------------------
+// Round in corso: salvato a ogni passaggio di schermata, così un refresh non
+// costringe a rifare la distribuzione dei ruoli.
+// ---------------------------------------------------------------------------
+const RESUMABLE_SCREENS = new Set(['cover', 'reveal', 'starter', 'vote', 'elim', 'mrwhite-guess']);
+
+function saveGame() {
+  if (!RESUMABLE_SCREENS.has(currentScreenId) || !ST.players.length) return;
   try {
-    const raw = JSON.parse(sessionStorage.getItem(USED_WORDS_KEY) || '[]');
-    if (Array.isArray(raw)) ST.usedWords = new Set(raw);
+    localStorage.setItem(GAME_KEY, JSON.stringify({
+      at: Date.now(),
+      screen: currentScreenId,
+      playerCount: ST.playerCount,
+      impostorCount: ST.impostorCount,
+      mrWhiteCount: ST.mrWhiteCount,
+      hintsEnabled: ST.hintsEnabled,
+      secretWord: ST.secretWord,
+      secretWordHints: ST.secretWordHints,
+      hintOrder: ST.hintOrder,
+      players: ST.players,
+      currentPlayerIndex: ST.currentPlayerIndex,
+      lastEliminated: ST.lastEliminated,
+      starterName: ST.starterName,
+      scored: ST.scored
+    }));
   } catch (e) {}
 }
 
-function saveUsedWords() {
-  try {
-    sessionStorage.setItem(USED_WORDS_KEY, JSON.stringify([...ST.usedWords]));
-  } catch (e) {}
+function clearSavedGame() {
+  try { localStorage.removeItem(GAME_KEY); } catch (e) {}
+}
+
+function readSavedGame() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(GAME_KEY) || 'null'); } catch (e) {}
+  if (!raw || typeof raw !== 'object') return null;
+  if (!Array.isArray(raw.players) || !raw.players.length) return null;
+  if (!RESUMABLE_SCREENS.has(raw.screen)) return null;
+  if (!Number.isFinite(raw.at) || Date.now() - raw.at > SESSION_MAX_IDLE_MS) return null;
+  return raw;
+}
+
+function resumeGame() {
+  const g = readSavedGame();
+  if (!g) {
+    renderResumeBanner();
+    return;
+  }
+  ST.playerCount = g.players.length;
+  ST.impostorCount = Number(g.impostorCount) || 0;
+  ST.mrWhiteCount = Number(g.mrWhiteCount) || 0;
+  ST.hintsEnabled = g.hintsEnabled !== false;
+  ST.secretWord = String(g.secretWord || '');
+  ST.secretWordHints = Array.isArray(g.secretWordHints) ? g.secretWordHints : [];
+  ST.hintOrder = Array.isArray(g.hintOrder) ? g.hintOrder : [];
+  ST.players = g.players.map(p => ({
+    name: String(p.name || ''),
+    role: p.role,
+    eliminated: !!p.eliminated,
+    hintIndex: Number.isFinite(p.hintIndex) ? p.hintIndex : null
+  }));
+  ST.currentPlayerIndex = Math.min(Math.max(0, Number(g.currentPlayerIndex) || 0), ST.playerCount - 1);
+  ST.lastEliminated = Number.isFinite(g.lastEliminated) ? g.lastEliminated : null;
+  ST.starterName = String(g.starterName || '');
+  ST.scored = !!g.scored;
+  ST.votedOut = null;
+
+  const eliminated = ST.lastEliminated !== null ? ST.players[ST.lastEliminated] : null;
+  if (g.screen === 'starter' && ST.starterName) showStarterScreen(ST.starterName);
+  else if (g.screen === 'vote') showVoteScreen();
+  else if (g.screen === 'elim' && eliminated) showEliminationScreen(eliminated);
+  else if (g.screen === 'mrwhite-guess' && eliminated) showMrWhiteGuess();
+  // 'reveal' riparte dalla copertina: nessun ruolo va mostrato senza che il
+  // telefono sia passato di mano.
+  else showCover();
+  toast('Partita ripresa da dove eravate.');
+}
+
+function discardSavedGame() {
+  if (!confirm('Scartare la partita interrotta?')) return;
+  clearSavedGame();
+  renderResumeBanner();
+  toast('Partita scartata.');
 }
 
 let toastTimer = null;
@@ -237,8 +422,10 @@ function toast(message) {
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + id).classList.add('active');
+  currentScreenId = id;
   updateBottomNav(id);
   window.scrollTo(0, 0);
+  saveGame();
 }
 
 function updateBottomNav(screenId) {
@@ -552,6 +739,91 @@ function renderHomePills() {
   });
 }
 
+function renderResumeBanner() {
+  const el = document.getElementById('resume-banner');
+  if (!el) return;
+  const g = readSavedGame();
+  if (!g) {
+    el.classList.remove('show');
+    el.innerHTML = '';
+    return;
+  }
+  const where = {
+    cover: 'durante la consegna dei ruoli',
+    reveal: 'durante la consegna dei ruoli',
+    starter: "all'apertura della discussione",
+    vote: 'alla votazione',
+    elim: 'dopo un\'eliminazione',
+    'mrwhite-guess': 'al tentativo di Mr. White'
+  }[g.screen] || 'a metà';
+  el.innerHTML = `
+    <div class="resume-text">
+      <strong>Partita interrotta</strong>
+      <span>${g.players.length} giocatori, ${escapeHTML(where)}. I ruoli sono ancora quelli.</span>
+    </div>
+    <div class="resume-actions">
+      <button class="btn btn-primary" id="btn-resume-game" type="button">Riprendi</button>
+      <button class="btn btn-secondary" id="btn-discard-game" type="button">Scarta</button>
+    </div>`;
+  el.classList.add('show');
+  document.getElementById('btn-resume-game').onclick = resumeGame;
+  document.getElementById('btn-discard-game').onclick = discardSavedGame;
+}
+
+let historyOpen = false;
+
+function renderSessionCard() {
+  const card = document.getElementById('session-card');
+  if (!card) return;
+  if (!sessionHasContent()) {
+    card.classList.remove('show');
+    card.innerHTML = '';
+    return;
+  }
+  const rounds = ST.session.rounds === 1 ? '1 round giocato' : `${ST.session.rounds} round giocati`;
+  card.innerHTML = `
+    <div class="card-title">Serata <span class="card-title-meta">${rounds}</span></div>
+    ${buildScoreboardBlock('Classifica') || '<p class="session-empty">Ancora nessun punto assegnato.</p>'}
+    ${buildHistoryBlock()}
+    <div class="session-actions">
+      <button class="sa-btn" id="btn-end-session" type="button">Termina serata e azzera</button>
+    </div>`;
+  card.classList.add('show');
+  const toggle = document.getElementById('btn-toggle-history');
+  if (toggle) toggle.onclick = () => { historyOpen = !historyOpen; renderSessionCard(); };
+  document.getElementById('btn-end-session').onclick = endSession;
+}
+
+const HISTORY_LABELS = {
+  civilians: { text: 'civili', cls: 'ok' },
+  impostors: { text: 'impostori', cls: 'bad' },
+  'mrwhite-win': { text: 'Mr. White', cls: 'mw' },
+  'mrwhite-survived': { text: 'Mr. White', cls: 'mw' },
+  cambiata: { text: 'cambiata', cls: 'muted' },
+  annullata: { text: 'annullata', cls: 'muted' }
+};
+
+function buildHistoryBlock() {
+  const list = ST.session.history;
+  if (!list.length) return '';
+  const label = list.length === 1 ? '1 parola uscita' : `${list.length} parole uscite`;
+  if (!historyOpen) {
+    return `<div class="history-block"><button class="link-btn" id="btn-toggle-history" type="button">${label} ▾</button></div>`;
+  }
+  const rows = [...list].reverse().map(h => {
+    const tag = HISTORY_LABELS[h.outcome];
+    return `<div class="history-row">
+      <span class="history-word">${escapeHTML(h.word)}</span>
+      <span class="history-pack">${escapeHTML(h.pack || '')}</span>
+      ${tag ? `<span class="history-tag ${tag.cls}">${tag.text}</span>` : '<span class="history-tag muted">in corso</span>'}
+    </div>`;
+  }).join('');
+  return `<div class="history-block">
+    <button class="link-btn" id="btn-toggle-history" type="button">${label} ▴</button>
+    <div class="history-list">${rows}</div>
+  </div>`;
+}
+
 function toggleHomePack(id) {
   if (ST.selectedPackIds.has(id)) {
     if (ST.selectedPackIds.size === 1) {
@@ -616,7 +888,8 @@ function buildEditor(p) {
     <textarea class="packet-textarea" id="pta-${id}" spellcheck="false" placeholder="pizza,rotonda,mozzarella,Napoli,italiana&#10;gelato,freddo,cono,estate,artigianale">${escapeHTML(p.lines.join('\n'))}</textarea>
     <div class="btn-row">
       <button class="psave" onclick="savePacket('${id}',this)">Salva</button>
-      <button class="psave pgray" onclick="exportOne('${id}')" title="Esporta">⬆</button>
+      <button class="psave pgray" onclick="sharePacket('${id}')" title="Condividi con un link">🔗</button>
+      <button class="psave pgray" onclick="exportOne('${id}')" title="Esporta in JSON">⬆</button>
       <button class="pdel" onclick="delPacket('${id}')">Elimina</button>
     </div>
   </div>`;
@@ -927,6 +1200,131 @@ function createPacketFromAIResponse() {
   }, 60);
 }
 
+// ---------------------------------------------------------------------------
+// Condivisione via link: il pacchetto viaggia nel frammento dell'URL, quindi
+// non passa mai da un server. Quando il browser sa comprimere lo fa, il primo
+// carattere dice con quale formato è stato codificato.
+// ---------------------------------------------------------------------------
+const SHARE_MAX_URL = 8000;
+
+function bytesToBase64Url(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 4096) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + 4096));
+  }
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlToBytes(text) {
+  const b64 = text.replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
+  return Uint8Array.from(bin, ch => ch.charCodeAt(0));
+}
+
+async function squeeze(bytes, mode) {
+  const Ctor = mode === 'deflate' ? self.CompressionStream : self.DecompressionStream;
+  const stream = new Ctor('deflate-raw');
+  const buf = await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer();
+  return new Uint8Array(buf);
+}
+
+async function packetToCode(p) {
+  const payload = JSON.stringify({ v: 1, n: p.label, e: p.emoji, c: p.colorIdx, l: p.lines });
+  const bytes = new TextEncoder().encode(payload);
+  if (typeof self.CompressionStream === 'function') {
+    try {
+      return 'z' + bytesToBase64Url(await squeeze(bytes, 'deflate'));
+    } catch (e) {}
+  }
+  return 'p' + bytesToBase64Url(bytes);
+}
+
+async function codeToPacket(code) {
+  const kind = code[0];
+  const body = code.slice(1);
+  if ((kind !== 'z' && kind !== 'p') || !/^[A-Za-z0-9\-_]+$/.test(body)) throw new Error('formato');
+  let bytes = base64UrlToBytes(body);
+  if (kind === 'z') {
+    if (typeof self.DecompressionStream !== 'function') throw new Error('compressione');
+    bytes = await squeeze(bytes, 'inflate');
+  }
+  const raw = JSON.parse(new TextDecoder().decode(bytes));
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.l)) throw new Error('contenuto');
+  const lines = raw.l
+    .filter(l => typeof l === 'string')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .slice(0, 1000);
+  if (!lines.length) throw new Error('vuoto');
+  return {
+    label: String(raw.n || 'Pacchetto condiviso').slice(0, 60),
+    emoji: [...String(raw.e || '📦')].slice(0, 2).join('') || '📦',
+    colorIdx: Number.isInteger(raw.c) && raw.c >= 0 ? raw.c % COLORS.length : 3,
+    lines
+  };
+}
+
+function shareBaseUrl() {
+  return location.origin + location.pathname;
+}
+
+async function sharePacket(id) {
+  const p = packets.find(x => x.id === id);
+  if (!p) return;
+  const lines = p.lines.filter(l => l.trim());
+  if (!lines.length) {
+    alert('Il pacchetto è vuoto: non c\'è niente da condividere.');
+    return;
+  }
+  let url;
+  try {
+    url = shareBaseUrl() + '#pack=' + await packetToCode({ ...p, lines });
+  } catch (e) {
+    alert('Non riesco a creare il link.');
+    return;
+  }
+  if (url.length > SHARE_MAX_URL) {
+    alert(`Il pacchetto è troppo grande per un link (${lines.length} voci). Usa l'esportazione in JSON.`);
+    return;
+  }
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: p.label, text: `Pacchetto "${p.label}" per Impostore`, url });
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+  }
+  copyText(url)
+    .then(() => toast(`Link copiato (${lines.length} voci). Incollalo dove vuoi.`))
+    .catch(() => prompt('Copia il link:', url));
+}
+
+// Un link condiviso non importa niente da solo: serve una conferma esplicita.
+async function handleSharedPacket() {
+  const match = /[#&]pack=([A-Za-z0-9\-_]+)/.exec(location.hash);
+  if (!match) return;
+  history.replaceState(null, '', shareBaseUrl() + location.search);
+  let shared;
+  try {
+    shared = await codeToPacket(match[1]);
+  } catch (e) {
+    alert(e && e.message === 'compressione'
+      ? 'Questo link usa una compressione che il tuo browser non supporta.'
+      : 'Il link del pacchetto non è valido.');
+    return;
+  }
+  if (!confirm(`Aggiungere il pacchetto "${shared.label}" con ${shared.lines.length} voci?`)) return;
+  const id = 'sh_' + Date.now().toString(36);
+  packets.push(normalizePacket({ ...shared, id }));
+  ST.selectedPackIds.add(id);
+  savePackets();
+  savePrefs();
+  renderHomePills();
+  if (currentScreenId === 'settings') buildPacketEditors();
+  toast(`Pacchetto "${shared.label}" aggiunto e selezionato.`);
+}
+
 function exportOne(id) {
   const p = packets.find(x => x.id === id);
   if (!p) return;
@@ -1003,6 +1401,7 @@ function buildWordPool() {
       const key = normalizeWord(entry.word);
       if (!key || seen.has(key)) continue;
       seen.add(key);
+      entry.pack = p.label;
       pool.push(entry);
     }
   }
@@ -1034,7 +1433,8 @@ function pickWord({ exclude = null } = {}) {
   ST.secretWordHints = e.hints;
   ST.hintOrder = shuffle(e.hints.map((_, i) => i));
   ST.usedWords.add(normalizeWord(e.word));
-  saveUsedWords();
+  recordWordDrawn(e);
+  saveSession();
   return true;
 }
 
@@ -1052,6 +1452,9 @@ function buildPlayers() {
   });
   ST.currentPlayerIndex = 0;
   ST.votedOut = null;
+  ST.lastEliminated = null;
+  ST.starterName = '';
+  ST.scored = false;
 }
 
 function startGame() {
@@ -1113,6 +1516,7 @@ function changeWord() {
     return;
   }
   if (!confirm('Cambiare parola? I ruoli restano gli stessi, ma il telefono va ripassato a tutti.')) return;
+  setLastWordOutcome('cambiata');
   if (!pickWord({ exclude: ST.secretWord })) return;
   localStorage.setItem(WORD_CHANGE_KEY, String(Date.now()));
   ST.players.forEach(p => { p.eliminated = false; });
@@ -1125,6 +1529,9 @@ function changeWord() {
 function exitGame() {
   if (!confirm('Uscire dalla partita? Il round in corso viene annullato.')) return;
   stopWordChangeTicker();
+  setLastWordOutcome('annullata');
+  saveSession();
+  clearSavedGame();
   goHome();
 }
 
@@ -1205,11 +1612,12 @@ function pickStartingPlayer() {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function showStarterScreen() {
-  const starter = pickStartingPlayer();
+function showStarterScreen(name = null) {
+  // Alla ripresa dopo un refresh si riusa lo stesso nome, non se ne sorteggia un altro.
+  ST.starterName = name || pickStartingPlayer().name;
   document.getElementById('starter-card').innerHTML = `
     <div class="result-emoji">🎤</div>
-    <div class="result-title">Parte ${escapeHTML(starter.name)}</div>
+    <div class="result-title">Parte ${escapeHTML(ST.starterName)}</div>
     <div class="result-sub">Apri la discussione con il primo indizio.</div>
   `;
   showScreen('starter');
@@ -1255,15 +1663,21 @@ function confirmVote() {
     alert('Seleziona un giocatore!');
     return;
   }
-  const el = ST.players[ST.votedOut];
+  const idx = ST.votedOut;
+  const el = ST.players[idx];
   el.eliminated = true;
+  ST.lastEliminated = idx;
   ST.votedOut = null;
   if (el.role === 'mrwhite') {
-    document.getElementById('mrwhite-guess-input').value = '';
-    showScreen('mrwhite-guess');
+    showMrWhiteGuess();
     return;
   }
   showEliminationScreen(el);
+}
+
+function showMrWhiteGuess() {
+  document.getElementById('mrwhite-guess-input').value = '';
+  showScreen('mrwhite-guess');
 }
 
 function showEliminationScreen(player) {
@@ -1334,25 +1748,64 @@ function showResult(outcome) {
     emoji = '⚪️'; title = 'Mr. White vince!'; sub = 'Ha indovinato la parola segreta. Genio del bluff!';
   }
 
+  const gains = awardPoints(outcome);
+  clearSavedGame();
+
   document.getElementById('result-card').innerHTML = `
     <div class="result-emoji">${emoji}</div>
     <div class="result-title">${title}</div>
     <div class="result-sub">${sub}</div>
-    <div class="role-summary">${buildRoleSummaryRows()}</div>`;
+    <div class="role-summary">${buildRoleSummaryRows()}</div>
+    ${buildRoundPointsBlock(gains)}
+    ${buildScoreboardBlock('Classifica della serata')}`;
 
   showScreen('result');
 }
 
+function buildRoundPointsBlock(gains) {
+  if (!gains.length) return '';
+  const rows = gains
+    .sort((a, b) => b.pts - a.pts || a.name.localeCompare(b.name))
+    .map(g => `<div class="info-row"><span>${escapeHTML(g.name)}</span><span class="pts-gain">+${g.pts}</span></div>`)
+    .join('');
+  return `<div class="score-block"><div class="score-block-title">Punti di questo round</div>${rows}</div>`;
+}
+
+function buildScoreboardBlock(title) {
+  const rows = scoreboardRows();
+  if (!rows.length) return '';
+  const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
+  const body = rows.map(r => `
+    <div class="score-row${r.rank === 1 ? ' leader' : ''}">
+      <span class="score-rank">${medals[r.rank] || r.rank}</span>
+      <span class="score-name">${escapeHTML(r.name)}</span>
+      <span class="score-pts">${r.pts}</span>
+    </div>`).join('');
+  const roundLabel = ST.session.rounds === 1 ? '1 round' : `${ST.session.rounds} round`;
+  return `<div class="score-block">
+    <div class="score-block-title">${escapeHTML(title)} <span class="score-block-meta">${roundLabel}</span></div>
+    ${body}
+  </div>`;
+}
+
 function showRolesAndExit() {
+  // Round chiuso senza vincitore: nessun punto assegnato.
+  setLastWordOutcome('annullata');
+  saveSession();
+  clearSavedGame();
   document.getElementById('role-summary-card').innerHTML = `
     <div class="result-emoji">👀</div>
     <div class="result-title">Ruoli rivelati</div>
-    <div class="result-sub">La partita si chiude qui.</div>
-    <div class="role-summary">${buildRoleSummaryRows()}</div>`;
+    <div class="result-sub">La partita si chiude qui: nessun punto assegnato.</div>
+    <div class="role-summary">${buildRoleSummaryRows()}</div>
+    ${buildScoreboardBlock('Classifica della serata')}`;
   showScreen('role-summary');
 }
 
 function goHome() {
+  stopWordChangeTicker();
+  renderSessionCard();
+  renderResumeBanner();
   showScreen('home');
 }
 
@@ -1438,7 +1891,7 @@ async function init() {
     } catch (e) {}
   }
   loadPrefs();
-  loadUsedWords();
+  loadSession();
 
   let manifest = DEFAULT_PACKET_FILES;
   try {
@@ -1482,6 +1935,9 @@ async function init() {
   clampRoles();
   renderPlayerNames();
   renderHomePills();
+  renderSessionCard();
+  renderResumeBanner();
+  await handleSharedPacket();
 }
 
 if ('serviceWorker' in navigator) {

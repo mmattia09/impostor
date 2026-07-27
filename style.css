@@ -498,6 +498,227 @@ body.has-bottom-nav {
   gap: var(--spacing-sm);
 }
 
+/* Banner di ripresa partita */
+.resume-banner {
+  display: none;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.resume-banner.show {
+  display: flex;
+}
+
+.resume-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.resume-text strong {
+  font-size: 15px;
+}
+
+.resume-text span {
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.4;
+}
+
+.resume-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.resume-actions .btn {
+  padding: 11px;
+  font-size: 15px;
+}
+
+/* Serata: classifica e cronologia */
+.session-card {
+  display: none;
+}
+
+.session-card.show {
+  display: block;
+}
+
+.card-title-meta,
+.score-block-meta {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text3);
+  letter-spacing: 0;
+}
+
+.score-block {
+  margin-top: var(--spacing-lg);
+}
+
+.score-block:first-of-type {
+  margin-top: 0;
+}
+
+.score-block-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text2);
+  margin-bottom: var(--spacing-sm);
+}
+
+.score-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: 9px var(--spacing-md);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+}
+
+.score-row:nth-child(odd) {
+  background: var(--surface2);
+}
+
+.score-row.leader {
+  background: var(--accent-soft);
+}
+
+.score-rank {
+  flex: 0 0 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text2);
+}
+
+.score-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.score-pts {
+  flex: 0 0 auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.pts-gain {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.session-empty {
+  font-size: 14px;
+  color: var(--text2);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.history-block {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--border);
+}
+
+.history-list {
+  margin-top: var(--spacing-md);
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 7px var(--spacing-sm);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.history-row:nth-child(even) {
+  background: var(--surface2);
+}
+
+.history-word {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.history-pack {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text3);
+}
+
+.history-tag {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.history-tag.ok {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.history-tag.bad {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.history-tag.mw {
+  background: var(--mrw-soft);
+  color: var(--mrw);
+}
+
+.history-tag.muted {
+  background: var(--surface3);
+  color: var(--text3);
+}
+
+.session-actions {
+  margin-top: var(--spacing-lg);
+}
+
+.session-actions .sa-btn {
+  width: 100%;
+}
+
 /* Toast */
 .toast {
   position: fixed;
@@ -565,19 +786,24 @@ body.has-bottom-nav .toast {
   margin-bottom: var(--spacing-xl);
 }
 
+/* La barra deve cedere spazio al pulsante: senza questo il flex-shrink:0
+   qui sotto la tiene a tutta riga e spinge la ✕ fuori dallo schermo. */
 .game-top-row .progress-bar {
   margin-bottom: 0;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
 }
 
 .game-exit-btn {
   flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--surface2);
   color: var(--text2);
-  font-size: 15px;
+  font-size: 17px;
   line-height: 1;
   cursor: pointer;
   font-family: inherit;
@@ -585,14 +811,21 @@ body.has-bottom-nav .toast {
   align-items: center;
   justify-content: center;
   transition: background 0.15s, color 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.game-exit-btn:hover {
-  background: var(--danger-soft);
-  color: var(--danger);
+/* Su touch :hover resta incollato dopo il tap: lo attiviamo solo con un mouse. */
+@media (hover: hover) {
+  .game-exit-btn:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
 }
 
 .game-exit-btn:active {
+  background: var(--danger-soft);
+  color: var(--danger);
   transform: scale(0.94);
 }
 

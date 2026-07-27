@@ -3,6 +3,7 @@
 [![Deploy](https://img.shields.io/github/actions/workflow/status/mmattia09/impostor/static.yml?branch=main&label=deploy&style=for-the-badge)](https://github.com/mmattia09/impostor/actions/workflows/static.yml)
 [![GitHub Pages](https://img.shields.io/badge/gioca-online-0071e3?style=for-the-badge)](https://mmattia09.github.io/impostor/)
 [![Zero dipendenze](https://img.shields.io/badge/dipendenze-0-34c759?style=for-the-badge)](#struttura-del-progetto)
+[![Licenza: MIT](https://img.shields.io/badge/licenza-MIT-blue?style=for-the-badge)](LICENSE)
 
 Un party game da un solo telefono: i **civili** conoscono la parola segreta, gli
 **impostori** devono fingere di conoscerla, **Mr. White** non sa nulla e deve
@@ -29,13 +30,23 @@ dopo la prima apertura, si installa sulla home del telefono e porta con sé
   anche di più parole. L'ordine è mescolato a ogni parola, quindi con un solo
   impostore non esce sempre il primo indizio della riga.
 - **Niente parole ripetute** — una parola già uscita non torna finché il
-  pacchetto non è esaurito. La memoria dura quanto la sessione del browser.
+  pacchetto non è esaurito, per tutta la durata della serata.
 - **Cambio parola** — se chi apre la discussione non conosce la parola può
   scartarla e farne estrarre un'altra, **una volta ogni 10 minuti**. I ruoli
   restano gli stessi, si ripassa solo il telefono.
 - **Uscita in qualsiasi momento** — durante la rivelazione dei ruoli c'è sempre
   una ✕ per annullare il round, e dalla votazione si può chiudere la partita
   mostrando tutti i ruoli.
+- **Punteggi che si accumulano** — ogni round assegna punti e la classifica
+  della serata resta in home fino a quando non la azzeri.
+- **A prova di refresh** — punteggi, cronologia e round in corso vivono sul
+  dispositivo: se ricarichi la pagina per sbaglio, in home trovi *Riprendi* e la
+  partita torna esattamente dov'era, con gli stessi ruoli.
+- **Cronologia delle parole** — l'elenco di tutto quello che è uscito nella
+  serata, con il pacchetto di provenienza e come è finito il round.
+- **Pacchetti condivisibili con un link** — un pacchetto viaggia dentro l'URL,
+  compresso: lo mandi su WhatsApp e chi lo apre se lo ritrova nell'app dopo una
+  conferma. Nessun file, nessun server di mezzo.
 - **Sorteggio di chi parla per primo** — mai un Mr. White, che altrimenti
   dovrebbe inventarsi un indizio dal nulla.
 - **17 pacchetti parole** — da *Facile* a *Difficile*, più cibo, animali, luoghi,
@@ -68,6 +79,22 @@ dopo la prima apertura, si installa sulla home del telefono e porta con sé
    quando restano in numero pari o superiore ai civili (vincono loro).
 6. Mr. White, se eliminato, ha una possibilità: indovinare la parola e vincere da
    solo. Accenti e maiuscole non contano.
+
+## Punteggi
+
+A fine round i punti si assegnano così:
+
+| Esito | Punti |
+|-------|-------|
+| Vincono i civili | **+2** a ogni civile |
+| Vincono gli impostori | **+3** a ogni impostore, **+1** a un Mr. White ancora vivo |
+| Mr. White indovina la parola | **+4** a Mr. White |
+| Mr. White resta in piedi fino alla parità | **+4** a Mr. White |
+| Partita chiusa con *Mostra ruoli ed esci* | nessun punto |
+
+I punti sono legati al **nome** del giocatore, quindi restano suoi anche se
+cambia posto nel giro. La classifica compare in home e sulla schermata di fine
+round; si azzera solo con *Termina serata* o dopo 12 ore di inattività.
 
 ## Pacchetti inclusi
 
@@ -169,9 +196,23 @@ punti: il parametro `?v=` dei due tag in `index.html` e la costante `CACHE` in
 | `imp_names` | localStorage | I nomi dei giocatori |
 | `imp_theme` | localStorage | Tema scelto a mano |
 | `imp_word_change_at` | localStorage | Ultimo cambio parola, per il limite dei 10 minuti |
-| `imp_used_words` | sessionStorage | Parole già uscite in questa sessione |
+| `imp_session_v1` | localStorage | Serata in corso: punteggi, cronologia, parole già uscite |
+| `imp_game_v1` | localStorage | Round interrotto, per poterlo riprendere |
 
 Non c'è un backend: cancellare i dati del sito riporta l'app allo stato iniziale.
+
+### Come sopravvive a un refresh
+
+Il round in corso viene salvato a ogni cambio di schermata, e la serata a ogni
+parola estratta o punto assegnato. Ricaricare la pagina — o chiudere per sbaglio
+la scheda — non perde niente: in home compare un banner con **Riprendi**.
+
+La ripresa riparte sempre dalla **copertina** del giocatore di turno, mai dal
+ruolo scoperto: chi ha in mano il telefono dopo il refresh non vede il ruolo di
+qualcun altro. Ruoli, parola e indizi restano quelli di prima.
+
+Dopo **12 ore** di inattività la serata si considera chiusa e si riparte con
+punteggi e cronologia puliti; puoi comunque azzerarla a mano con *Termina serata*.
 
 ## Deploy
 
@@ -185,9 +226,11 @@ Domande e bug → [GitHub Issues](https://github.com/mmattia09/impostor/issues).
 
 ## Idee per il futuro
 
-- Punteggi che si accumulano tra un round e l'altro.
-- Modalità con parola simile per gli impostori invece di soli indizi.
+- **Parola simile** per gli impostori invece dei soli indizi: i civili ricevono
+  *Cappuccino*, gli impostori *Caffè macchiato*. Nessuno sa da che parte sta, e
+  chi è troppo generico si tradisce da solo.
 - Timer per la discussione e per il turno di ogni giocatore.
+- Ruoli extra per gruppi numerosi.
 - Traduzione dell'interfaccia in altre lingue.
 
 ## Autori e ringraziamenti
@@ -197,8 +240,7 @@ Di [@mmattia09](https://github.com/mmattia09). Sviluppato con l'aiuto di
 
 ## Licenza
 
-Al momento il repository non include un file di licenza: valgono quindi i termini
-di default del diritto d'autore. Se vuoi riutilizzare il codice, apri una issue.
+[MIT](LICENSE).
 
 ## Stato del progetto
 
