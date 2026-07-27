@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Impostore</title>
-  <link rel="stylesheet" href="style.css?v=16">
+  <link rel="stylesheet" href="style.css?v=17">
   <script>
     (function() {
       var t = localStorage.getItem('imp_theme') ||
@@ -18,7 +18,7 @@
     <!-- HOME -->
     <div class="screen active" id="screen-home">
       <div class="header" style="position:relative;">
-        <button class="theme-btn" id="btn-theme" aria-label="Cambia tema">🌙</button>
+        <button class="theme-btn" id="btn-theme" type="button" aria-label="Cambia tema"></button>
         <h1>Impostore</h1>
         <p>Chi è il traditore tra voi?</p>
       </div>
@@ -35,6 +35,9 @@
           <button class="step-btn" id="btn-players-plus" type="button" aria-label="Aumenta numero giocatori">+</button>
         </div>
         <div class="player-name-list" id="player-name-list"></div>
+        <button class="add-player-btn" id="btn-add-player" type="button">
+          <span data-icon="userPlus"></span> Aggiungi giocatore
+        </button>
       </div>
       <div class="card">
         <div class="card-title">Ruoli</div>
@@ -62,7 +65,15 @@
           </div>
         </div>
         <div class="divider"></div>
-        <div class="toggle-row">
+        <div class="mode-block">
+          <h3 class="mode-title">Cosa ricevono gli impostori</h3>
+          <div class="segmented" id="mode-select" role="radiogroup" aria-label="Modalità di gioco">
+            <button class="seg-btn active" type="button" role="radio" aria-checked="true" data-mode="hints">Indizio</button>
+            <button class="seg-btn" type="button" role="radio" aria-checked="false" data-mode="twin">Parola simile</button>
+          </div>
+          <p class="mode-note" id="mode-note"></p>
+        </div>
+        <div class="toggle-row" id="hints-row">
           <div class="toggle-info">
             <h3>Indizi agli impostori</h3>
             <p>Ogni impostore riceve 1 indizio</p>
@@ -75,7 +86,7 @@
         <div class="packet-grid" id="home-packet-grid"></div>
       </div>
       <div class="start-row">
-        <button class="settings-gear" id="btn-settings" type="button" aria-label="Apri impostazioni pacchetti">⚙️</button>
+        <button class="settings-gear" id="btn-settings" type="button" data-icon="settings" aria-label="Apri impostazioni pacchetti"></button>
         <button class="btn btn-primary" id="btn-start" style="flex: 1;">Inizia la partita</button>
       </div>
     </div>
@@ -89,18 +100,19 @@
       </div>
       <div class="settings-intro">
         Formato per ogni riga: <code>parola,indizio1,indizio2,...</code><br>
-        Una voce per riga &nbsp;·&nbsp; Indizi opzionali, quanti ne vuoi &nbsp;·&nbsp; Ogni indizio può essere più parole
+        Una voce per riga &nbsp;·&nbsp; Indizi opzionali, quanti ne vuoi &nbsp;·&nbsp; Ogni indizio può essere più parole<br>
+        Per la modalità <em>Parola simile</em>: <code>parola|parola simile,indizio1,...</code>
       </div>
       <div class="sa-row">
-        <button class="sa-btn" id="btn-export-all">⬆ Esporta tutti</button>
-        <label class="sa-btn" id="btn-import" role="button" tabindex="0" aria-label="Importa pacchetti JSON" style="cursor: pointer;">
-          ⬇ Importa
+        <button class="sa-btn" id="btn-export-all" type="button"><span data-icon="upload"></span> Esporta tutti</button>
+        <label class="sa-btn" id="btn-import" role="button" tabindex="0" aria-label="Importa pacchetti JSON">
+          <span data-icon="download"></span> Importa
           <input type="file" id="file-import" accept=".json" style="display: none;">
         </label>
       </div>
       <div id="packet-editors"></div>
-      <button class="add-packet-btn" id="btn-add-packet">+ Aggiungi pacchetto</button>
-      <button class="add-packet-btn ai-open-btn" id="btn-ai-packet">✨ Crea pacchetto con AI</button>
+      <button class="add-packet-btn" id="btn-add-packet" type="button"><span data-icon="plus"></span> Aggiungi pacchetto</button>
+      <button class="add-packet-btn ai-open-btn" id="btn-ai-packet" type="button"><span data-icon="sparkles"></span> Crea pacchetto con AI</button>
     </div>
 
     <!-- COVER -->
@@ -109,7 +121,7 @@
         <div class="progress-bar">
           <div class="progress-fill" id="cover-pb"></div>
         </div>
-        <button class="game-exit-btn" type="button" data-action="exit-game" aria-label="Esci dalla partita" title="Esci dalla partita">✕</button>
+        <button class="game-exit-btn" type="button" data-action="exit-game" data-icon="x" aria-label="Esci dalla partita" title="Esci dalla partita"></button>
       </div>
       <div class="cover-screen">
         <div class="cover-icon">🙈</div>
@@ -124,7 +136,7 @@
         <div class="progress-bar">
           <div class="progress-fill" id="reveal-pb"></div>
         </div>
-        <button class="game-exit-btn" type="button" data-action="exit-game" aria-label="Esci dalla partita" title="Esci dalla partita">✕</button>
+        <button class="game-exit-btn" type="button" data-action="exit-game" data-icon="x" aria-label="Esci dalla partita" title="Esci dalla partita"></button>
       </div>
       <div class="reveal-top">
         <div class="player-card" id="player-card"></div>
@@ -186,7 +198,7 @@
 
   <div class="ai-modal" id="ai-pack-modal">
     <div class="ai-pack-panel" id="ai-pack-panel">
-      <button class="ai-close" id="btn-ai-close" aria-label="Chiudi">×</button>
+      <button class="ai-close" id="btn-ai-close" type="button" data-icon="x" aria-label="Chiudi"></button>
       <div class="ai-setup" id="ai-setup">
         <div class="card-title">Crea pacchetto con AI</div>
         <div class="ai-form-grid">
@@ -236,6 +248,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="script.js?v=16"></script>
+  <script src="script.js?v=17"></script>
 </body>
 </html>

@@ -23,6 +23,43 @@ const EMOJIS = [
   '🐉','🦊','🌺','🍄','🎵','🔮','⚽','🎨'
 ];
 
+// Icone disegnate a mano in SVG: niente font esterni, niente richieste di rete,
+// e il colore segue il testo del pulsante che le contiene.
+const ICONS = {
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/>',
+  grip: '<path d="M4 9h16M4 15h16"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.5 3.5l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.5 20.5l1.7-1.7"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  sparkles: '<path d="m12 3 1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3Z"/><path d="m19 15 .8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2Z"/>',
+  chevron: '<path d="m6 9 6 6 6-6"/>',
+  check: '<path d="m20 6-11 11-5-5"/>',
+  userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6m3-3h-6"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 15.2-6.5L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.2 6.5L3 16"/><path d="M3 21v-5h5"/>',
+  logOut: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
+  arrowRight: '<path d="M5 12h14m-6-7 7 7-7 7"/>',
+  help: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+  trash: '<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>'
+};
+
+function icon(name, extra = '') {
+  const body = ICONS[name];
+  if (!body) return '';
+  return `<svg class="icon${extra ? ' ' + extra : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor"`
+    + ` stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
+}
+
+// Riempie gli elementi statici marcati con data-icon nell'HTML.
+function renderStaticIcons(root = document) {
+  root.querySelectorAll('[data-icon]').forEach(el => {
+    el.innerHTML = icon(el.dataset.icon);
+  });
+}
+
 let packets = [];
 let playerDrag = null;
 let defaultPacketIds = new Set();
@@ -51,8 +88,8 @@ const DEFAULT_PACKET_FILES = [
 // Pacchetti rimossi dall'app: vanno ripuliti anche dai salvataggi vecchi.
 const RETIRED_PACKET_IDS = ['boomer', 'memes', 'spicy'];
 
-const PACKS_KEY = 'imp_packs_v4';
-const LEGACY_PACKS_KEY = 'imp_packs_v3';
+const PACKS_KEY = 'imp_packs_v5';
+const LEGACY_PACKS_KEYS = ['imp_packs_v4', 'imp_packs_v3'];
 const DELETED_DEFAULTS_KEY = 'imp_deleted_defaults';
 const PREFS_KEY = 'imp_prefs';
 const SESSION_KEY = 'imp_session_v1';
@@ -94,6 +131,13 @@ function safePacketId(id) {
   return safe || 'packet';
 }
 
+// Salviamo solo i pacchetti che l'utente ha davvero toccato, più i suoi. Se
+// salvassimo tutto, una copia vecchia in localStorage bloccherebbe per sempre le
+// parole nuove che arrivano con gli aggiornamenti dell'app.
+function isUserPacket(p) {
+  return !defaultPacketIds.has(p.id) || p.edited === true;
+}
+
 function readStoredPackets() {
   const stored = localStorage.getItem(PACKS_KEY);
   if (stored) {
@@ -103,19 +147,23 @@ function readStoredPackets() {
     } catch (e) {}
     return null;
   }
-  // Migrazione dal formato precedente: tiene i pacchetti custom, scarta quelli ritirati.
-  const legacy = localStorage.getItem(LEGACY_PACKS_KEY);
-  if (!legacy) return null;
-  try {
-    const saved = JSON.parse(legacy);
-    if (!Array.isArray(saved)) return null;
-    const migrated = saved.filter(p => p && !RETIRED_PACKET_IDS.includes(safePacketId(p.id)));
-    localStorage.setItem(PACKS_KEY, JSON.stringify(migrated));
-    localStorage.removeItem(LEGACY_PACKS_KEY);
-    return migrated;
-  } catch (e) {
-    return null;
+  // Migrazione: dei salvataggi vecchi teniamo solo i pacchetti creati
+  // dall'utente. Quelli di serie tornano alla versione aggiornata dell'app.
+  for (const key of LEGACY_PACKS_KEYS) {
+    const legacy = localStorage.getItem(key);
+    if (!legacy) continue;
+    try {
+      const saved = JSON.parse(legacy);
+      if (!Array.isArray(saved)) continue;
+      const migrated = saved.filter(p =>
+        p && p.id && !RETIRED_PACKET_IDS.includes(safePacketId(p.id))
+        && !defaultPacketIds.has(safePacketId(p.id)));
+      localStorage.setItem(PACKS_KEY, JSON.stringify(migrated));
+      LEGACY_PACKS_KEYS.forEach(k => localStorage.removeItem(k));
+      return migrated;
+    } catch (e) {}
   }
+  return null;
 }
 
 function loadDeletedDefaults() {
@@ -150,7 +198,13 @@ function loadPackets(defaults) {
 }
 
 function savePackets() {
-  localStorage.setItem(PACKS_KEY, JSON.stringify(packets));
+  localStorage.setItem(PACKS_KEY, JSON.stringify(packets.filter(isUserPacket)));
+}
+
+// Da chiamare a ogni modifica dell'utente su un pacchetto di serie.
+function markEdited(id) {
+  const p = packets.find(x => x.id === id);
+  if (p) p.edited = true;
 }
 
 function loadPrefs() {
@@ -161,6 +215,7 @@ function loadPrefs() {
     if (Number.isFinite(raw.impostorCount)) ST.impostorCount = Math.max(0, raw.impostorCount);
     if (Number.isFinite(raw.mrWhiteCount)) ST.mrWhiteCount = Math.max(0, raw.mrWhiteCount);
     if (typeof raw.hintsEnabled === 'boolean') ST.hintsEnabled = raw.hintsEnabled;
+    if (raw.mode === 'twin' || raw.mode === 'hints') ST.mode = raw.mode;
     if (Array.isArray(raw.selectedPackIds)) ST.selectedPackIds = new Set(raw.selectedPackIds);
   } catch (e) {}
 }
@@ -171,6 +226,7 @@ function savePrefs() {
     impostorCount: ST.impostorCount,
     mrWhiteCount: ST.mrWhiteCount,
     hintsEnabled: ST.hintsEnabled,
+    mode: ST.mode,
     selectedPackIds: [...ST.selectedPackIds]
   }));
 }
@@ -193,6 +249,8 @@ const ST = {
   impostorCount: 1,
   mrWhiteCount: 0,
   hintsEnabled: true,
+  mode: 'hints',
+  secretTwin: '',
   selectedPackIds: new Set(),
   players: [],
   currentPlayerIndex: 0,
@@ -339,7 +397,9 @@ function saveGame() {
       impostorCount: ST.impostorCount,
       mrWhiteCount: ST.mrWhiteCount,
       hintsEnabled: ST.hintsEnabled,
+      mode: ST.mode,
       secretWord: ST.secretWord,
+      secretTwin: ST.secretTwin,
       secretWordHints: ST.secretWordHints,
       hintOrder: ST.hintOrder,
       players: ST.players,
@@ -375,7 +435,9 @@ function resumeGame() {
   ST.impostorCount = Number(g.impostorCount) || 0;
   ST.mrWhiteCount = Number(g.mrWhiteCount) || 0;
   ST.hintsEnabled = g.hintsEnabled !== false;
+  ST.mode = g.mode === 'twin' ? 'twin' : 'hints';
   ST.secretWord = String(g.secretWord || '');
+  ST.secretTwin = String(g.secretTwin || '');
   ST.secretWordHints = Array.isArray(g.secretWordHints) ? g.secretWordHints : [];
   ST.hintOrder = Array.isArray(g.hintOrder) ? g.hintOrder : [];
   ST.players = g.players.map(p => ({
@@ -435,14 +497,14 @@ function updateBottomNav(screenId) {
   if (screenId === 'cover') {
     const btn = document.createElement('button');
     btn.className = 'btn btn-primary';
-    btn.textContent = 'Sono pronto →';
+    btn.innerHTML = 'Sono pronto ' + icon('arrowRight', 'icon-sm');
     btn.id = 'btn-reveal';
     nav.appendChild(btn);
     document.getElementById('bottom-nav').classList.add('active');
   } else if (screenId === 'reveal') {
     const btn = document.createElement('button');
     btn.className = 'btn btn-primary';
-    btn.textContent = 'Copri e passa →';
+    btn.innerHTML = 'Copri e passa ' + icon('arrowRight', 'icon-sm');
     btn.id = 'btn-next-player';
     nav.appendChild(btn);
     document.getElementById('bottom-nav').classList.add('active');
@@ -451,7 +513,7 @@ function updateBottomNav(screenId) {
     group.className = 'btn-group';
     group.innerHTML = `
       <button class="btn btn-primary" id="btn-confirm-vote">Conferma eliminazione</button>
-      <button class="btn btn-secondary" id="btn-show-roles-exit">Mostra ruoli ed esci</button>
+      <button class="btn btn-secondary" id="btn-show-roles-exit">${icon('logOut', 'icon-sm')} Mostra ruoli ed esci</button>
     `;
     nav.appendChild(group);
     document.getElementById('bottom-nav').classList.add('active');
@@ -459,15 +521,15 @@ function updateBottomNav(screenId) {
     const group = document.createElement('div');
     group.className = 'btn-group';
     group.innerHTML = `
-      <button class="btn btn-primary" id="btn-go-vote">Vai alla votazione →</button>
-      <button class="btn btn-secondary" id="btn-change-word">Cambia parola</button>
+      <button class="btn btn-primary" id="btn-go-vote">Vai alla votazione ${icon('arrowRight', 'icon-sm')}</button>
+      <button class="btn btn-secondary" id="btn-change-word">${icon('refresh', 'icon-sm')} Cambia parola</button>
     `;
     nav.appendChild(group);
     document.getElementById('bottom-nav').classList.add('active');
   } else if (screenId === 'elim') {
     const btn = document.createElement('button');
     btn.className = 'btn btn-primary';
-    btn.textContent = 'Continua il gioco →';
+    btn.innerHTML = 'Continua il gioco ' + icon('arrowRight', 'icon-sm');
     btn.id = 'btn-continue-elim';
     nav.appendChild(btn);
     document.getElementById('bottom-nav').classList.add('active');
@@ -484,7 +546,7 @@ function updateBottomNav(screenId) {
     const group = document.createElement('div');
     group.className = 'btn-group';
     group.innerHTML = `
-      <button class="btn btn-primary" id="btn-new-round">Nuova partita →</button>
+      <button class="btn btn-primary" id="btn-new-round">Nuova partita ${icon('arrowRight', 'icon-sm')}</button>
       <button class="btn btn-secondary" id="btn-go-home">Menu principale</button>
     `;
     nav.appendChild(group);
@@ -541,7 +603,7 @@ function renderPlayerNames() {
     const dragBtn = document.createElement('button');
     dragBtn.className = 'name-drag-btn';
     dragBtn.type = 'button';
-    dragBtn.textContent = '☰';
+    dragBtn.innerHTML = icon('grip');
     dragBtn.title = 'Trascina per riordinare';
     dragBtn.setAttribute('aria-label', 'Riordina ' + (ST.playerNames[i]?.trim() || 'Giocatore ' + (i + 1)));
     dragBtn.onpointerdown = e => startPlayerReorder(e, i);
@@ -551,16 +613,18 @@ function renderPlayerNames() {
     input.placeholder = 'Giocatore ' + (i + 1);
     input.value = ST.playerNames[i] || '';
     input.oninput = (e) => { ST.playerNames[i] = e.target.value; savePlayerNames(); };
+    // Invio: passa al nome successivo, e sull'ultimo aggiunge un giocatore.
     input.onkeydown = (e) => {
-      if (e.key === 'Enter') {
-        const next = document.querySelectorAll('.name-input')[i + 1];
-        if (next) next.focus();
-      }
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const next = document.querySelectorAll('.name-input')[i + 1];
+      if (next) next.focus();
+      else addPlayer();
     };
     const delBtn = document.createElement('button');
     delBtn.className = 'name-delete-btn';
     delBtn.type = 'button';
-    delBtn.textContent = '×';
+    delBtn.innerHTML = icon('x', 'icon-sm');
     delBtn.title = 'Rimuovi nome';
     delBtn.setAttribute('aria-label', 'Rimuovi ' + (ST.playerNames[i]?.trim() || 'Giocatore ' + (i + 1)));
     delBtn.onclick = () => removePlayer(i);
@@ -653,6 +717,26 @@ function adjustPlayers(d) {
   renderPlayerNames();
 }
 
+function addPlayer() {
+  syncPlayerNamesFromInputs();
+  if (ST.playerCount >= 12) {
+    toast('Massimo 12 giocatori.');
+    return;
+  }
+  ST.playerCount++;
+  ST.playerNames[ST.playerCount - 1] = '';
+  document.getElementById('player-count').textContent = ST.playerCount;
+  clampRoles();
+  savePlayerNames();
+  renderPlayerNames();
+  const inputs = document.querySelectorAll('.name-input');
+  const last = inputs[inputs.length - 1];
+  if (last) {
+    last.focus();
+    last.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
 function removePlayer(idx) {
   const label = (ST.playerNames[idx] || '').trim() || 'Giocatore ' + (idx + 1);
   if (!confirm('Rimuovere ' + label + '?')) return;
@@ -704,6 +788,33 @@ function updateHintsToggle() {
   toggle.setAttribute('aria-checked', String(ST.hintsEnabled));
 }
 
+function setMode(mode) {
+  ST.mode = mode === 'twin' ? 'twin' : 'hints';
+  updateModeUI();
+  savePrefs();
+}
+
+function updateModeUI() {
+  document.querySelectorAll('#mode-select .seg-btn').forEach(btn => {
+    const on = btn.dataset.mode === ST.mode;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-checked', String(on));
+  });
+  const twin = ST.mode === 'twin';
+  document.getElementById('hints-row').hidden = twin;
+  const note = document.getElementById('mode-note');
+  if (twin) {
+    const pairs = buildWordPool({ requireTwin: true }).length;
+    note.textContent = pairs
+      ? `Civili e impostori ricevono parole diverse ma vicine, e nessuno sa quale ha. ${pairs} coppie nei pacchetti scelti.`
+      : 'Nessuna coppia nei pacchetti scelti: scegline altri o torna alla modalità Indizio.';
+    note.classList.toggle('warn', !pairs);
+  } else {
+    note.textContent = 'Gli impostori non ricevono la parola e sanno di essere impostori.';
+    note.classList.remove('warn');
+  }
+}
+
 function updateStepperStates() {
   const maxRoles = ST.playerCount - 1;
   const controls = [
@@ -737,6 +848,7 @@ function renderHomePills() {
     btn.onclick = () => toggleHomePack(p.id);
     g.appendChild(btn);
   });
+  updateModeUI();
 }
 
 function renderResumeBanner() {
@@ -808,7 +920,7 @@ function buildHistoryBlock() {
   if (!list.length) return '';
   const label = list.length === 1 ? '1 parola uscita' : `${list.length} parole uscite`;
   if (!historyOpen) {
-    return `<div class="history-block"><button class="link-btn" id="btn-toggle-history" type="button">${label} ▾</button></div>`;
+    return `<div class="history-block"><button class="link-btn" id="btn-toggle-history" type="button">${label} ${icon('chevron', 'icon-sm')}</button></div>`;
   }
   const rows = [...list].reverse().map(h => {
     const tag = HISTORY_LABELS[h.outcome];
@@ -819,7 +931,7 @@ function buildHistoryBlock() {
     </div>`;
   }).join('');
   return `<div class="history-block">
-    <button class="link-btn" id="btn-toggle-history" type="button">${label} ▴</button>
+    <button class="link-btn open" id="btn-toggle-history" type="button">${label} ${icon('chevron', 'icon-sm')}</button>
     <div class="history-list">${rows}</div>
   </div>`;
 }
@@ -872,7 +984,7 @@ function buildEditor(p) {
   const linesCount = p.lines.filter(l => l.trim()).length;
   div.innerHTML = `<div class="packet-header" onclick="togglePE('${id}')">
     <div class="ph-left"><div class="pdot" style="background:${c.hex};"></div><span class="pname">${emoji} ${label}</span><span class="pcount" id="pc-${id}">${linesCount} voci</span></div>
-    <span class="pchev" id="pch-${id}">▾</span>
+    <span class="pchev" id="pch-${id}">${icon('chevron', 'icon-sm')}</span>
   </div>
   <div class="packet-body" id="pb-${id}">
     <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
@@ -888,9 +1000,9 @@ function buildEditor(p) {
     <textarea class="packet-textarea" id="pta-${id}" spellcheck="false" placeholder="pizza,rotonda,mozzarella,Napoli,italiana&#10;gelato,freddo,cono,estate,artigianale">${escapeHTML(p.lines.join('\n'))}</textarea>
     <div class="btn-row">
       <button class="psave" onclick="savePacket('${id}',this)">Salva</button>
-      <button class="psave pgray" onclick="sharePacket('${id}')" title="Condividi con un link">🔗</button>
-      <button class="psave pgray" onclick="exportOne('${id}')" title="Esporta in JSON">⬆</button>
-      <button class="pdel" onclick="delPacket('${id}')">Elimina</button>
+      <button class="psave pgray" onclick="sharePacket('${id}')" title="Condividi con un link" aria-label="Condividi con un link">${icon('link', 'icon-sm')}</button>
+      <button class="psave pgray" onclick="exportOne('${id}')" title="Esporta in JSON" aria-label="Esporta in JSON">${icon('upload', 'icon-sm')}</button>
+      <button class="pdel" onclick="delPacket('${id}')">${icon('trash', 'icon-sm')} Elimina</button>
     </div>
   </div>`;
   return div;
@@ -916,6 +1028,7 @@ function updatePName(id, v) {
 
 function commitPName(id) {
   if (!packets.some(x => x.id === id)) return;
+  markEdited(id);
   savePackets();
   renderHomePills();
 }
@@ -927,6 +1040,7 @@ function pickEmoji(id, em) {
   document.getElementById('eb-' + id).textContent = em;
   document.querySelector('#pe-' + id + ' .pname').textContent = em + ' ' + p.label;
   document.getElementById('epp-' + id).querySelectorAll('.ep-opt').forEach((el, i) => el.classList.toggle('sel', EMOJIS[i] === em));
+  markEdited(id);
   savePackets();
   renderHomePills();
 }
@@ -938,6 +1052,7 @@ function pickColor(id, ci) {
   const c = getColor(p);
   document.querySelector('#pe-' + id + ' .pdot').style.background = c.hex;
   document.getElementById('epp-' + id).querySelectorAll('.cp-opt').forEach((el, i) => el.classList.toggle('sel', i === ci));
+  markEdited(id);
   savePackets();
   renderHomePills();
 }
@@ -949,10 +1064,11 @@ function savePacket(id, btn) {
   if (ni) p.label = ni.value || p.label;
   p.lines = document.getElementById('pta-' + id).value.split('\n').map(l => l.trim()).filter(Boolean);
   document.getElementById('pc-' + id).textContent = p.lines.length + ' voci';
+  markEdited(id);
   savePackets();
   renderHomePills();
-  btn.textContent = '✓ Salvato';
-  setTimeout(() => btn.textContent = 'Salva', 1400);
+  btn.innerHTML = icon('check', 'icon-sm') + ' Salvato';
+  setTimeout(() => { btn.textContent = 'Salva'; }, 1400);
 }
 
 function delPacket(id) {
@@ -1384,13 +1500,22 @@ function importPackets(e) {
 }
 
 // Game Logic
+// Formato riga: "parola,indizio,indizio" oppure "parola|parola simile,indizio,indizio".
+// La parola dopo la barra è quella che ricevono gli impostori in modalità gemella.
 function parseLine(l) {
   const pts = l.split(',').map(s => s.trim());
-  return { word: pts[0] || '', hints: pts.slice(1).filter(Boolean) };
+  const head = pts[0] || '';
+  const sep = head.indexOf('|');
+  return {
+    word: (sep === -1 ? head : head.slice(0, sep)).trim(),
+    twin: sep === -1 ? '' : head.slice(sep + 1).trim(),
+    hints: pts.slice(1).filter(Boolean)
+  };
 }
 
 // Unisce i pacchetti selezionati, scartando righe vuote e parole doppie tra pacchetti.
-function buildWordPool() {
+// In modalità gemella restano solo le voci che hanno una parola simile.
+function buildWordPool({ requireTwin = ST.mode === 'twin' } = {}) {
   const pool = [];
   const seen = new Set();
   for (const id of ST.selectedPackIds) {
@@ -1400,6 +1525,7 @@ function buildWordPool() {
       const entry = parseLine(line);
       const key = normalizeWord(entry.word);
       if (!key || seen.has(key)) continue;
+      if (requireTwin && !entry.twin) continue;
       seen.add(key);
       entry.pack = p.label;
       pool.push(entry);
@@ -1411,7 +1537,9 @@ function buildWordPool() {
 function pickWord({ exclude = null } = {}) {
   const pool = buildWordPool();
   if (!pool.length) {
-    alert('Nessuna parola disponibile! Controlla i pacchetti selezionati.');
+    alert(ST.mode === 'twin'
+      ? 'Nessuna coppia di parole simili nei pacchetti scelti. Scegline altri o passa alla modalità Indizio.'
+      : 'Nessuna parola disponibile! Controlla i pacchetti selezionati.');
     return false;
   }
 
@@ -1430,6 +1558,7 @@ function pickWord({ exclude = null } = {}) {
 
   const e = available[Math.floor(Math.random() * available.length)];
   ST.secretWord = e.word;
+  ST.secretTwin = e.twin || '';
   ST.secretWordHints = e.hints;
   ST.hintOrder = shuffle(e.hints.map((_, i) => i));
   ST.usedWords.add(normalizeWord(e.word));
@@ -1485,7 +1614,8 @@ function updateChangeWordBtn() {
   if (!btn) return;
   const left = wordChangeRemainingMs();
   btn.disabled = left > 0;
-  btn.textContent = left > 0 ? `Cambia parola · disponibile tra ${formatCooldown(left)}` : 'Cambia parola';
+  btn.innerHTML = icon('refresh', 'icon-sm')
+    + (left > 0 ? ` Cambia parola · disponibile tra ${formatCooldown(left)}` : ' Cambia parola');
 }
 
 let wordChangeTimer = null;
@@ -1570,7 +1700,14 @@ function revealRole() {
   const p = ST.players[idx];
   const pct = playerPct();
   let html = `<div class="player-number">${escapeHTML(p.name)}</div>`;
-  if (p.role === 'civilian') {
+  // In modalità gemella civili e impostori vedono esattamente la stessa schermata:
+  // nessuno dei due sa da che parte sta, ed è tutto il gusto del gioco.
+  if (ST.mode === 'twin' && p.role !== 'mrwhite') {
+    const word = p.role === 'impostor' ? (ST.secretTwin || ST.secretWord) : ST.secretWord;
+    html += `<div class="role-icon neutral">${icon('help')}</div><div class="role-badge neutral">La tua parola</div>`
+      + `<div class="role-word">${escapeHTML(word)}</div>`
+      + `<p class="role-sub">Non sai se è la parola di tutti. Descrivila senza dirla e ascolta chi stona.</p>`;
+  } else if (p.role === 'civilian') {
     html += `<div class="role-icon civilian">🟢</div><div class="role-badge civilian">Civile</div><div class="role-word">${escapeHTML(ST.secretWord)}</div><p class="role-sub">Questa è la tua parola. Difendila senza rivelarla!</p>`;
   } else if (p.role === 'impostor') {
     html += `<div class="role-icon impostor">🔴</div><div class="role-badge impostor">Impostore</div><div class="role-word">???</div><p class="role-sub">Non conosci la parola. Fingila bene!</p>`;
@@ -1651,10 +1788,10 @@ function showVoteScreen() {
 function selectVote(idx) {
   document.querySelectorAll('.player-vote-item').forEach(el => el.classList.remove('selected'));
   document.querySelectorAll('.player-vote-item').forEach(el => el.setAttribute('aria-pressed', 'false'));
-  document.querySelectorAll('.vote-check').forEach(el => el.textContent = '');
+  document.querySelectorAll('.vote-check').forEach(el => { el.innerHTML = ''; });
   document.getElementById('vi-' + idx).classList.add('selected');
   document.getElementById('vi-' + idx).setAttribute('aria-pressed', 'true');
-  document.getElementById('vc-' + idx).textContent = '✓';
+  document.getElementById('vc-' + idx).innerHTML = icon('check', 'icon-sm');
   ST.votedOut = idx;
 }
 
@@ -1730,8 +1867,11 @@ function buildRoleSummaryRows() {
   const iN = ST.players.filter(p => p.role === 'impostor').map(p => p.name).join(', ');
   const mwN = ST.players.filter(p => p.role === 'mrwhite').map(p => p.name).join(', ');
 
-  let infoRows = `<div class="info-row"><span>Parola segreta</span><span><strong>${escapeHTML(ST.secretWord)}</strong></span></div>
-    <div class="info-row"><span>Impostori</span><span class="tag-i">${escapeHTML(iN || '—')}</span></div>`;
+  let infoRows = ST.mode === 'twin' && ST.secretTwin
+    ? `<div class="info-row"><span>Parola dei civili</span><span><strong>${escapeHTML(ST.secretWord)}</strong></span></div>
+       <div class="info-row"><span>Parola degli impostori</span><span><strong>${escapeHTML(ST.secretTwin)}</strong></span></div>`
+    : `<div class="info-row"><span>Parola segreta</span><span><strong>${escapeHTML(ST.secretWord)}</strong></span></div>`;
+  infoRows += `<div class="info-row"><span>Impostori</span><span class="tag-i">${escapeHTML(iN || '—')}</span></div>`;
   if (mwN) infoRows += `<div class="info-row"><span>Mr. White</span><span class="tag-mw">${escapeHTML(mwN)}</span></div>`;
   return infoRows;
 }
@@ -1844,6 +1984,10 @@ document.getElementById('file-import').onchange = importPackets;
 document.getElementById('btn-theme').onclick = toggleTheme;
 document.getElementById('btn-add-packet').onclick = addCustomPacket;
 document.querySelectorAll('[data-action="exit-game"]').forEach(btn => { btn.onclick = exitGame; });
+document.getElementById('btn-add-player').onclick = addPlayer;
+document.querySelectorAll('#mode-select .seg-btn').forEach(btn => {
+  btn.onclick = () => setMode(btn.dataset.mode);
+});
 
 // Theme
 function isDarkMode() {
@@ -1853,7 +1997,7 @@ function isDarkMode() {
 function updateThemeBtn() {
   const btn = document.getElementById('btn-theme');
   if (btn) {
-    btn.textContent = isDarkMode() ? '☀️' : '🌙';
+    btn.innerHTML = icon(isDarkMode() ? 'sun' : 'moon');
     btn.setAttribute('aria-label', isDarkMode() ? 'Passa al tema chiaro' : 'Passa al tema scuro');
   }
 }
@@ -1929,8 +2073,10 @@ async function init() {
     ST.selectedPackIds.add((packets.find(p => p.lines.length) || packets[0]).id);
   }
 
+  renderStaticIcons();
   updateThemeBtn();
   updateHintsToggle();
+  updateModeUI();
   document.getElementById('player-count').textContent = ST.playerCount;
   clampRoles();
   renderPlayerNames();

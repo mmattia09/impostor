@@ -19,13 +19,19 @@ dopo la prima apertura, si installa sulla home del telefono e porta con sé
 
 ## Funzionalità
 
+- **Due modalità** — *Indizio*: gli impostori sanno di esserlo e ricevono solo un
+  indizio. *Parola simile*: civili e impostori ricevono parole diverse ma vicine
+  (*Cappuccino* contro *Caffè macchiato*) e **nessuno sa da che parte sta** — si
+  tradisce chi resta troppo sul generico. **1224 coppie** già pronte.
 - **Tre ruoli** — civile (conosce la parola), impostore (non la conosce ma riceve
   un indizio), Mr. White (non riceve nulla e, se eliminato, può vincere da solo
   indovinando la parola).
 - **Da 3 a 12 giocatori**, con impostori e Mr. White regolabili separatamente. I
   limiti si aggiornano da soli: non puoi mai avere più infiltrati che civili.
 - **Nomi persistenti e riordinabili** — restano tra una partita e l'altra, si
-  trascinano per cambiare ordine e si rimuovono singolarmente.
+  trascinano per cambiare ordine e si rimuovono singolarmente. *Aggiungi
+  giocatore* ne infila uno nuovo, e l'Invio sull'ultimo nome fa lo stesso senza
+  staccare le mani dalla tastiera.
 - **Indizi diversi per ogni impostore** — ogni voce può avere quanti indizi vuoi,
   anche di più parole. L'ordine è mescolato a ogni parola, quindi con un solo
   impostore non esce sempre il primo indizio della riga.
@@ -118,8 +124,29 @@ round; si azzera solo con *Termina serata* o dopo 12 ore di inattività.
 | 🎸 Strumenti | 73 | Strumenti musicali di tutto il mondo |
 | 🗣 Slang | 75 | Gergo di internet e delle nuove generazioni |
 
+La colonna *Voci* conta tutte le parole; l'89% di esse ha anche una parola simile
+per la seconda modalità.
+
 Ogni riga di un pacchetto ha la forma `parola,indizio1,indizio2,...`: il primo
 campo è la parola segreta, tutti gli altri sono indizi distribuiti agli impostori.
+
+Per la modalità *Parola simile* la riga porta due parole separate da una barra:
+
+```
+Cappuccino|Caffè macchiato,schiuma,mattina,bar
+Ossobuco|Stinco,midollo,gremolada,cottura lenta
+```
+
+Prima della barra la parola dei civili, dopo quella degli impostori; gli indizi
+restano e servono all'altra modalità. Una riga senza barra funziona come sempre,
+ma non viene estratta in modalità *Parola simile*.
+
+## Interfaccia
+
+Le icone sono SVG scritti a mano dentro `script.js` e iniettati nei pulsanti
+marcati `data-icon`: nessun font esterno, nessuna richiesta di rete, colore che
+segue il testo e resa nitida in tema chiaro e scuro. Le emoji restano solo dove
+sono contenuto, cioè sui pacchetti parole e sulle schermate di esito.
 
 ## Struttura del progetto
 
@@ -153,6 +180,7 @@ Per aggiungerne uno di serie al repository:
      "colorIdx": 3,
      "lines": [
        "parola,indizio1,indizio2 di più parole,indizio3",
+       "parola|parola simile,indizio1,indizio2",
        "altra parola,solo un indizio"
      ]
    }
@@ -165,6 +193,10 @@ Per aggiungerne uno di serie al repository:
 
 Regole per un pacchetto fatto bene: niente virgole dentro parole o indizi, niente
 doppioni, e nessun indizio che contenga la parola segreta.
+
+I pacchetti di serie che non hai mai toccato **non** finiscono nel `localStorage`:
+così, quando l'app si aggiorna, le parole nuove arrivano anche a chi gioca da
+mesi. Appena ne modifichi uno, quella tua versione ha la precedenza e resta.
 
 ## Sviluppo locale
 
@@ -190,7 +222,7 @@ punti: il parametro `?v=` dei due tag in `index.html` e la costante `CACHE` in
 
 | Chiave | Dove | Cosa contiene |
 |--------|------|---------------|
-| `imp_packs_v4` | localStorage | I pacchetti, con le tue modifiche |
+| `imp_packs_v5` | localStorage | Solo i pacchetti che hai creato o modificato |
 | `imp_deleted_defaults` | localStorage | I pacchetti di serie che hai eliminato |
 | `imp_prefs` | localStorage | Giocatori, ruoli, indizi on/off, pacchetti scelti |
 | `imp_names` | localStorage | I nomi dei giocatori |
@@ -226,9 +258,6 @@ Domande e bug → [GitHub Issues](https://github.com/mmattia09/impostor/issues).
 
 ## Idee per il futuro
 
-- **Parola simile** per gli impostori invece dei soli indizi: i civili ricevono
-  *Cappuccino*, gli impostori *Caffè macchiato*. Nessuno sa da che parte sta, e
-  chi è troppo generico si tradisce da solo.
 - Timer per la discussione e per il turno di ogni giocatore.
 - Ruoli extra per gruppi numerosi.
 - Traduzione dell'interfaccia in altre lingue.
