@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Impostore</title>
-  <link rel="stylesheet" href="style.css?v=14">
+  <link rel="stylesheet" href="style.css?v=15">
   <script>
     (function() {
       var t = localStorage.getItem('imp_theme') ||
@@ -103,8 +103,11 @@
 
     <!-- COVER -->
     <div class="screen" id="screen-cover">
-      <div class="progress-bar">
-        <div class="progress-fill" id="cover-pb"></div>
+      <div class="game-top-row">
+        <div class="progress-bar">
+          <div class="progress-fill" id="cover-pb"></div>
+        </div>
+        <button class="game-exit-btn" type="button" data-action="exit-game" aria-label="Esci dalla partita" title="Esci dalla partita">✕</button>
       </div>
       <div class="cover-screen">
         <div class="cover-icon">🙈</div>
@@ -115,8 +118,11 @@
 
     <!-- REVEAL -->
     <div class="screen" id="screen-reveal">
-      <div class="progress-bar">
-        <div class="progress-fill" id="reveal-pb"></div>
+      <div class="game-top-row">
+        <div class="progress-bar">
+          <div class="progress-fill" id="reveal-pb"></div>
+        </div>
+        <button class="game-exit-btn" type="button" data-action="exit-game" aria-label="Esci dalla partita" title="Esci dalla partita">✕</button>
       </div>
       <div class="reveal-top">
         <div class="player-card" id="player-card"></div>
@@ -128,6 +134,11 @@
       <div class="starter-card" id="starter-card"></div>
     </div>
 
+    <!-- ELIMINATED -->
+    <div class="screen" id="screen-elim">
+      <div class="elim-card" id="elim-card"></div>
+    </div>
+
     <!-- VOTE -->
     <div class="screen" id="screen-vote">
       <div class="nav-row">
@@ -136,16 +147,6 @@
       <div class="card">
         <div class="card-title">Chi vuoi eliminare?</div>
         <div class="player-list" id="vote-list"></div>
-      </div>
-    </div>
-
-    <!-- CIVILIAN ELIMINATED -->
-    <div class="screen" id="screen-civilian-elim">
-      <div class="civ-elim-card">
-        <div style="font-size: 64px; margin-bottom: var(--spacing-lg);">😮</div>
-        <div style="font-size: 22px; font-weight: 700; margin-bottom: var(--spacing-md);" id="civ-elim-name"></div>
-        <div style="font-size: 17px; color: var(--success); font-weight: 600; margin-bottom: var(--spacing-lg);">Era un civile!</div>
-        <p style="font-size: 15px; color: var(--text2); line-height: 1.5;">Gli impostori sono ancora in circolazione. Il gioco continua.</p>
       </div>
     </div>
 
@@ -231,6 +232,8 @@
     </div>
   </div>
 
-  <script src="script.js?v=14"></script>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="script.js?v=15"></script>
 </body>
 </html>

@@ -25,21 +25,39 @@ const EMOJIS = [
 
 let packets = [];
 let playerDrag = null;
+let defaultPacketIds = new Set();
 
+// Fallback se data/manifest.json non è raggiungibile: deve restare allineato al manifest.
 const DEFAULT_PACKET_FILES = [
   'packet-easy',
   'packet-medium',
   'packet-hard',
+  'packet-cibo',
+  'packet-animali',
+  'packet-luoghi',
+  'packet-cinema',
+  'packet-musica',
+  'packet-sport',
+  'packet-scienza',
+  'packet-mitologia',
   'packet-brands',
   'packet-boardgames',
-  'packet-slang',
-  'packet-boomer',
-  'packet-spicy',
-  'packet-minecraft',
   'packet-videogames',
-  'packet-memes',
-  'packet-instruments'
+  'packet-minecraft',
+  'packet-instruments',
+  'packet-slang'
 ];
+
+// Pacchetti rimossi dall'app: vanno ripuliti anche dai salvataggi vecchi.
+const RETIRED_PACKET_IDS = ['boomer', 'memes', 'spicy'];
+
+const PACKS_KEY = 'imp_packs_v4';
+const LEGACY_PACKS_KEY = 'imp_packs_v3';
+const DELETED_DEFAULTS_KEY = 'imp_deleted_defaults';
+const PREFS_KEY = 'imp_prefs';
+const USED_WORDS_KEY = 'imp_used_words';
+const WORD_CHANGE_KEY = 'imp_word_change_at';
+const WORD_CHANGE_COOLDOWN_MS = 10 * 60 * 1000;
 
 function normalizePacket(p) {
   return { ...p, id: safePacketId(p.id), lines: Array.isArray(p.lines) ? [...p.lines] : [] };
@@ -64,26 +82,85 @@ function safePacketId(id) {
   return safe || 'packet';
 }
 
-function loadPackets(defaults) {
-  const stored = localStorage.getItem('imp_packs_v3');
+function readStoredPackets() {
+  const stored = localStorage.getItem(PACKS_KEY);
   if (stored) {
     try {
       const saved = JSON.parse(stored);
-      if (Array.isArray(saved) && saved.some(p => Array.isArray(p.lines) && p.lines.length > 0)) {
-        const byId = new Map(defaults.map(p => [p.id, normalizePacket(p)]));
-        saved
-          .filter(p => p && p.id && p.label && Array.isArray(p.lines))
-          .forEach(p => byId.set(p.id, normalizePacket(p)));
-        packets = [...byId.values()];
-        return;
-      }
+      if (Array.isArray(saved)) return saved;
     } catch (e) {}
+    return null;
   }
-  packets = defaults.map(normalizePacket);
+  // Migrazione dal formato precedente: tiene i pacchetti custom, scarta quelli ritirati.
+  const legacy = localStorage.getItem(LEGACY_PACKS_KEY);
+  if (!legacy) return null;
+  try {
+    const saved = JSON.parse(legacy);
+    if (!Array.isArray(saved)) return null;
+    const migrated = saved.filter(p => p && !RETIRED_PACKET_IDS.includes(safePacketId(p.id)));
+    localStorage.setItem(PACKS_KEY, JSON.stringify(migrated));
+    localStorage.removeItem(LEGACY_PACKS_KEY);
+    return migrated;
+  } catch (e) {
+    return null;
+  }
+}
+
+function loadDeletedDefaults() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DELETED_DEFAULTS_KEY) || '[]');
+    return new Set(Array.isArray(raw) ? raw : []);
+  } catch (e) {
+    return new Set();
+  }
+}
+
+function saveDeletedDefaults(set) {
+  localStorage.setItem(DELETED_DEFAULTS_KEY, JSON.stringify([...set]));
+}
+
+function loadPackets(defaults) {
+  const removed = loadDeletedDefaults();
+  const base = defaults.map(normalizePacket).filter(p => !removed.has(p.id));
+  const saved = readStoredPackets();
+  if (!saved) {
+    packets = base;
+    return;
+  }
+  const byId = new Map(base.map(p => [p.id, p]));
+  saved
+    .filter(p => p && p.id && p.label && Array.isArray(p.lines))
+    .map(normalizePacket)
+    .filter(p => !RETIRED_PACKET_IDS.includes(p.id) && !removed.has(p.id))
+    .forEach(p => byId.set(p.id, p));
+  packets = [...byId.values()];
+  if (!packets.length) packets = base;
 }
 
 function savePackets() {
-  localStorage.setItem('imp_packs_v3', JSON.stringify(packets));
+  localStorage.setItem(PACKS_KEY, JSON.stringify(packets));
+}
+
+function loadPrefs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null');
+    if (!raw || typeof raw !== 'object') return;
+    if (Number.isFinite(raw.playerCount)) ST.playerCount = Math.max(3, Math.min(12, raw.playerCount));
+    if (Number.isFinite(raw.impostorCount)) ST.impostorCount = Math.max(0, raw.impostorCount);
+    if (Number.isFinite(raw.mrWhiteCount)) ST.mrWhiteCount = Math.max(0, raw.mrWhiteCount);
+    if (typeof raw.hintsEnabled === 'boolean') ST.hintsEnabled = raw.hintsEnabled;
+    if (Array.isArray(raw.selectedPackIds)) ST.selectedPackIds = new Set(raw.selectedPackIds);
+  } catch (e) {}
+}
+
+function savePrefs() {
+  localStorage.setItem(PREFS_KEY, JSON.stringify({
+    playerCount: ST.playerCount,
+    impostorCount: ST.impostorCount,
+    mrWhiteCount: ST.mrWhiteCount,
+    hintsEnabled: ST.hintsEnabled,
+    selectedPackIds: [...ST.selectedPackIds]
+  }));
 }
 
 function savePlayerNames() {
@@ -109,15 +186,59 @@ const ST = {
   currentPlayerIndex: 0,
   secretWord: '',
   secretWordHints: [],
+  hintOrder: [],
+  usedWords: new Set(),
   votedOut: null
 };
+
+// Confronto "morbido": ignora maiuscole, accenti e punteggiatura.
+function normalizeWord(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function shuffle(arr) {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function loadUsedWords() {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(USED_WORDS_KEY) || '[]');
+    if (Array.isArray(raw)) ST.usedWords = new Set(raw);
+  } catch (e) {}
+}
+
+function saveUsedWords() {
+  try {
+    sessionStorage.setItem(USED_WORDS_KEY, JSON.stringify([...ST.usedWords]));
+  } catch (e) {}
+}
+
+let toastTimer = null;
+function toast(message) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = message;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
 
 // UI State Management
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + id).classList.add('active');
   updateBottomNav(id);
-  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+  window.scrollTo(0, 0);
 }
 
 function updateBottomNav(screenId) {
@@ -142,23 +263,25 @@ function updateBottomNav(screenId) {
     const group = document.createElement('div');
     group.className = 'btn-group';
     group.innerHTML = `
-      <button class="btn btn-secondary" id="btn-show-roles-exit">Mostra ruoli ed esci</button>
       <button class="btn btn-primary" id="btn-confirm-vote">Conferma eliminazione</button>
+      <button class="btn btn-secondary" id="btn-show-roles-exit">Mostra ruoli ed esci</button>
     `;
     nav.appendChild(group);
     document.getElementById('bottom-nav').classList.add('active');
   } else if (screenId === 'starter') {
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-primary';
-    btn.textContent = 'Vai alla votazione →';
-    btn.id = 'btn-go-vote';
-    nav.appendChild(btn);
+    const group = document.createElement('div');
+    group.className = 'btn-group';
+    group.innerHTML = `
+      <button class="btn btn-primary" id="btn-go-vote">Vai alla votazione →</button>
+      <button class="btn btn-secondary" id="btn-change-word">Cambia parola</button>
+    `;
+    nav.appendChild(group);
     document.getElementById('bottom-nav').classList.add('active');
-  } else if (screenId === 'civilian-elim') {
+  } else if (screenId === 'elim') {
     const btn = document.createElement('button');
     btn.className = 'btn btn-primary';
     btn.textContent = 'Continua il gioco →';
-    btn.id = 'btn-continue-civilian';
+    btn.id = 'btn-continue-elim';
     nav.appendChild(btn);
     document.getElementById('bottom-nav').classList.add('active');
   } else if (screenId === 'mrwhite-guess') {
@@ -203,7 +326,8 @@ function attachBottomNavListeners() {
     'btn-go-vote': showVoteScreen,
     'btn-show-roles-exit': showRolesAndExit,
     'btn-confirm-vote': confirmVote,
-    'btn-continue-civilian': continueAfterCivilian,
+    'btn-continue-elim': checkWin,
+    'btn-change-word': changeWord,
     'btn-mrwhite-confirm': checkMrWhiteGuess,
     'btn-mrwhite-giveup': mrwhiteGiveUp,
     'btn-new-round': newRound,
@@ -214,6 +338,9 @@ function attachBottomNavListeners() {
     const el = document.getElementById(id);
     if (el) el.onclick = fn;
   });
+
+  if (document.getElementById('btn-change-word')) startWordChangeTicker();
+  else stopWordChangeTicker();
 }
 
 // Home Screen
@@ -375,11 +502,13 @@ function clampRoles() {
   document.getElementById('impostor-count').textContent = ST.impostorCount;
   document.getElementById('mrwhite-count').textContent = ST.mrWhiteCount;
   updateStepperStates();
+  savePrefs();
 }
 
 function toggleHints() {
   ST.hintsEnabled = !ST.hintsEnabled;
   updateHintsToggle();
+  savePrefs();
 }
 
 function updateHintsToggle() {
@@ -434,6 +563,7 @@ function toggleHomePack(id) {
     ST.selectedPackIds.add(id);
   }
   renderHomePills();
+  savePrefs();
 }
 
 // Settings Screen
@@ -461,7 +591,6 @@ function buildPacketEditors() {
 
 function buildEditor(p) {
   const c = getColor(p);
-  const isBuiltIn = ['easy', 'medium', 'hard', 'custom'].includes(p.id);
   const label = escapeHTML(p.label);
   const emoji = escapeHTML(p.emoji);
   const id = escapeHTML(p.id);
@@ -476,7 +605,7 @@ function buildEditor(p) {
   <div class="packet-body" id="pb-${id}">
     <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
       <button class="emoji-btn" id="eb-${id}" onclick="toggleEP('${id}')">${emoji}</button>
-      <input class="packet-name-input" id="pni-${id}" value="${label}" placeholder="Nome pacchetto" oninput="updatePName('${id}',this.value)">
+      <input class="packet-name-input" id="pni-${id}" value="${label}" placeholder="Nome pacchetto" oninput="updatePName('${id}',this.value)" onchange="commitPName('${id}')">
     </div>
     <div class="ep-panel" id="epp-${id}">
       <div class="ep-section-label">Icona</div>
@@ -488,7 +617,7 @@ function buildEditor(p) {
     <div class="btn-row">
       <button class="psave" onclick="savePacket('${id}',this)">Salva</button>
       <button class="psave pgray" onclick="exportOne('${id}')" title="Esporta">⬆</button>
-      ${!isBuiltIn ? `<button class="pdel" onclick="delPacket('${id}')">Elimina</button>` : ''}
+      <button class="pdel" onclick="delPacket('${id}')">Elimina</button>
     </div>
   </div>`;
   return div;
@@ -512,6 +641,12 @@ function updatePName(id, v) {
   }
 }
 
+function commitPName(id) {
+  if (!packets.some(x => x.id === id)) return;
+  savePackets();
+  renderHomePills();
+}
+
 function pickEmoji(id, em) {
   const p = packets.find(x => x.id === id);
   if (!p) return;
@@ -519,6 +654,8 @@ function pickEmoji(id, em) {
   document.getElementById('eb-' + id).textContent = em;
   document.querySelector('#pe-' + id + ' .pname').textContent = em + ' ' + p.label;
   document.getElementById('epp-' + id).querySelectorAll('.ep-opt').forEach((el, i) => el.classList.toggle('sel', EMOJIS[i] === em));
+  savePackets();
+  renderHomePills();
 }
 
 function pickColor(id, ci) {
@@ -528,6 +665,8 @@ function pickColor(id, ci) {
   const c = getColor(p);
   document.querySelector('#pe-' + id + ' .pdot').style.background = c.hex;
   document.getElementById('epp-' + id).querySelectorAll('.cp-opt').forEach((el, i) => el.classList.toggle('sel', i === ci));
+  savePackets();
+  renderHomePills();
 }
 
 function savePacket(id, btn) {
@@ -544,11 +683,24 @@ function savePacket(id, btn) {
 }
 
 function delPacket(id) {
-  if (!confirm('Eliminare?')) return;
-  packets = packets.filter(p => p.id !== id);
+  const p = packets.find(x => x.id === id);
+  if (!p) return;
+  if (packets.length <= 1) {
+    alert('Deve restare almeno un pacchetto.');
+    return;
+  }
+  if (!confirm(`Eliminare "${p.label}"?`)) return;
+  packets = packets.filter(x => x.id !== id);
+  // I pacchetti di serie tornerebbero al prossimo avvio: ricordiamo che sono stati rimossi.
+  if (defaultPacketIds.has(id)) {
+    const removed = loadDeletedDefaults();
+    removed.add(id);
+    saveDeletedDefaults(removed);
+  }
   ST.selectedPackIds.delete(id);
   if (ST.selectedPackIds.size === 0 && packets.length > 0) ST.selectedPackIds.add(packets[0].id);
   savePackets();
+  savePrefs();
   buildPacketEditors();
   renderHomePills();
 }
@@ -786,38 +938,51 @@ function exportAllPackets() {
 }
 
 function dlJSON(data, name) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.href = url;
   a.download = name;
+  document.body.appendChild(a);
   a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 function importPackets(e) {
   const f = e.target.files[0];
+  e.target.value = '';
   if (!f) return;
   const r = new FileReader();
+  r.onerror = () => alert('Non riesco a leggere il file.');
   r.onload = ev => {
+    let arr;
     try {
-      let arr = JSON.parse(ev.target.result);
-      if (!Array.isArray(arr)) arr = [arr];
-      arr.forEach(p => {
-        if (!p.id || !p.label || !Array.isArray(p.lines)) return;
-        p.id = safePacketId(p.id);
-        if (packets.find(x => x.id === p.id)) p.id = p.id + '_' + Date.now();
-        if (p.colorIdx === undefined) p.colorIdx = 3;
-        if (!p.emoji) p.emoji = '📦';
-        packets.push(normalizePacket(p));
-      });
-      savePackets();
-      buildPacketEditors();
-      renderHomePills();
-      alert('Importati ' + arr.length + ' pacchetti!');
+      arr = JSON.parse(ev.target.result);
     } catch (err) {
       alert('Errore nel file JSON.');
+      return;
     }
+    if (!Array.isArray(arr)) arr = [arr];
+    let imported = 0;
+    arr.forEach(p => {
+      if (!p || !p.id || !p.label || !Array.isArray(p.lines)) return;
+      const copy = { ...p, id: safePacketId(p.id) };
+      if (packets.some(x => x.id === copy.id)) copy.id = copy.id + '_' + Date.now().toString(36);
+      if (!Number.isInteger(copy.colorIdx) || copy.colorIdx < 0) copy.colorIdx = 3;
+      if (!copy.emoji) copy.emoji = '📦';
+      packets.push(normalizePacket(copy));
+      imported++;
+    });
+    if (!imported) {
+      alert('Nessun pacchetto valido nel file.');
+      return;
+    }
+    savePackets();
+    buildPacketEditors();
+    renderHomePills();
+    alert(imported === 1 ? 'Importato 1 pacchetto!' : `Importati ${imported} pacchetti!`);
   };
   r.readAsText(f);
-  e.target.value = '';
 }
 
 // Game Logic
@@ -826,22 +991,50 @@ function parseLine(l) {
   return { word: pts[0] || '', hints: pts.slice(1).filter(Boolean) };
 }
 
-function pickWord() {
+// Unisce i pacchetti selezionati, scartando righe vuote e parole doppie tra pacchetti.
+function buildWordPool() {
   const pool = [];
+  const seen = new Set();
   for (const id of ST.selectedPackIds) {
     const p = packets.find(x => x.id === id);
     if (!p) continue;
-    p.lines.forEach(l => {
-      if (l.trim()) pool.push(parseLine(l));
-    });
+    for (const line of p.lines) {
+      const entry = parseLine(line);
+      const key = normalizeWord(entry.word);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      pool.push(entry);
+    }
   }
+  return pool;
+}
+
+function pickWord({ exclude = null } = {}) {
+  const pool = buildWordPool();
   if (!pool.length) {
-    alert('Nessuna parola disponibile!');
+    alert('Nessuna parola disponibile! Controlla i pacchetti selezionati.');
     return false;
   }
-  const e = pool[Math.floor(Math.random() * pool.length)];
+
+  let available = pool.filter(e => !ST.usedWords.has(normalizeWord(e.word)));
+  if (!available.length) {
+    // Parole finite: si riparte da capo, ma almeno non si ripete subito l'ultima.
+    ST.usedWords.clear();
+    available = pool;
+    toast('Parole del pacchetto esaurite: si riparte da capo.');
+  }
+  if (exclude && available.length > 1) {
+    const excludeKey = normalizeWord(exclude);
+    const filtered = available.filter(e => normalizeWord(e.word) !== excludeKey);
+    if (filtered.length) available = filtered;
+  }
+
+  const e = available[Math.floor(Math.random() * available.length)];
   ST.secretWord = e.word;
   ST.secretWordHints = e.hints;
+  ST.hintOrder = shuffle(e.hints.map((_, i) => i));
+  ST.usedWords.add(normalizeWord(e.word));
+  saveUsedWords();
   return true;
 }
 
@@ -851,12 +1044,8 @@ function buildPlayers() {
   for (let i = 0; i < ST.impostorCount; i++) roles.push('impostor');
   for (let i = 0; i < ST.mrWhiteCount; i++) roles.push('mrwhite');
   while (roles.length < total) roles.push('civilian');
-  for (let i = roles.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [roles[i], roles[j]] = [roles[j], roles[i]];
-  }
   let slot = 0;
-  ST.players = roles.map((role, i) => {
+  ST.players = shuffle(roles).map((role, i) => {
     const name = (ST.playerNames[i] || '').trim() || `Giocatore ${i + 1}`;
     const hintIndex = role === 'impostor' ? slot++ : null;
     return { name, role, eliminated: false, hintIndex };
@@ -875,6 +1064,68 @@ function newRound() {
   if (!pickWord()) return;
   buildPlayers();
   showCover();
+}
+
+function wordChangeRemainingMs() {
+  const last = Number(localStorage.getItem(WORD_CHANGE_KEY) || 0);
+  if (!Number.isFinite(last) || last <= 0) return 0;
+  return Math.max(0, Math.min(WORD_CHANGE_COOLDOWN_MS, WORD_CHANGE_COOLDOWN_MS - (Date.now() - last)));
+}
+
+function formatCooldown(ms) {
+  const total = Math.ceil(ms / 1000);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+
+function updateChangeWordBtn() {
+  const btn = document.getElementById('btn-change-word');
+  if (!btn) return;
+  const left = wordChangeRemainingMs();
+  btn.disabled = left > 0;
+  btn.textContent = left > 0 ? `Cambia parola · disponibile tra ${formatCooldown(left)}` : 'Cambia parola';
+}
+
+let wordChangeTimer = null;
+
+function startWordChangeTicker() {
+  stopWordChangeTicker();
+  updateChangeWordBtn();
+  if (wordChangeRemainingMs() === 0) return;
+  wordChangeTimer = setInterval(() => {
+    if (!document.getElementById('btn-change-word')) {
+      stopWordChangeTicker();
+      return;
+    }
+    updateChangeWordBtn();
+    if (wordChangeRemainingMs() === 0) stopWordChangeTicker();
+  }, 1000);
+}
+
+function stopWordChangeTicker() {
+  clearInterval(wordChangeTimer);
+  wordChangeTimer = null;
+}
+
+// Il primo giocatore può scartare una parola che non conosce, una volta ogni 10 minuti.
+function changeWord() {
+  if (wordChangeRemainingMs() > 0) {
+    updateChangeWordBtn();
+    return;
+  }
+  if (!confirm('Cambiare parola? I ruoli restano gli stessi, ma il telefono va ripassato a tutti.')) return;
+  if (!pickWord({ exclude: ST.secretWord })) return;
+  localStorage.setItem(WORD_CHANGE_KEY, String(Date.now()));
+  ST.players.forEach(p => { p.eliminated = false; });
+  ST.currentPlayerIndex = 0;
+  ST.votedOut = null;
+  showCover();
+  toast('Nuova parola estratta: ripassate il telefono a tutti.');
+}
+
+function exitGame() {
+  if (!confirm('Uscire dalla partita? Il round in corso viene annullato.')) return;
+  stopWordChangeTicker();
+  goHome();
 }
 
 function setPB(id, pct, fromPct = null) {
@@ -917,7 +1168,12 @@ function revealRole() {
   } else if (p.role === 'impostor') {
     html += `<div class="role-icon impostor">🔴</div><div class="role-badge impostor">Impostore</div><div class="role-word">???</div><p class="role-sub">Non conosci la parola. Fingila bene!</p>`;
     if (ST.hintsEnabled && ST.secretWordHints.length > 0) {
-      const h = ST.secretWordHints[(p.hintIndex ?? 0) % ST.secretWordHints.length];
+      // L'ordine degli indizi è mescolato a ogni parola: con un solo impostore
+      // non esce sempre e solo il primo indizio della riga.
+      const order = ST.hintOrder.length === ST.secretWordHints.length
+        ? ST.hintOrder
+        : ST.secretWordHints.map((_, i) => i);
+      const h = ST.secretWordHints[order[(p.hintIndex ?? 0) % order.length]];
       html += `<div class="hint-solo"><div class="hint-label">💡 Il tuo indizio</div><div class="hint-text">${escapeHTML(h)}</div></div>`;
     }
   } else {
@@ -1001,25 +1257,34 @@ function confirmVote() {
   }
   const el = ST.players[ST.votedOut];
   el.eliminated = true;
-  if (el.role === 'civilian') {
-    document.getElementById('civ-elim-name').textContent = el.name;
-    showScreen('civilian-elim');
-  } else if (el.role === 'mrwhite') {
+  ST.votedOut = null;
+  if (el.role === 'mrwhite') {
     document.getElementById('mrwhite-guess-input').value = '';
     showScreen('mrwhite-guess');
-  } else {
-    checkWin();
+    return;
   }
+  showEliminationScreen(el);
 }
 
-function continueAfterCivilian() {
-  checkWin();
+function showEliminationScreen(player) {
+  const civilian = player.role === 'civilian';
+  document.getElementById('elim-card').innerHTML = `
+    <div class="elim-emoji">${civilian ? '😮' : '🎯'}</div>
+    <div class="elim-name">${escapeHTML(player.name)}</div>
+    <div class="elim-role ${civilian ? 'civilian' : 'impostor'}">${civilian ? 'Era un civile!' : 'Era un impostore!'}</div>
+    <p class="elim-sub">${civilian
+      ? 'Gli impostori sono ancora in circolazione. Il gioco continua.'
+      : 'Un impostore in meno. Vediamo se ne restano altri.'}</p>`;
+  showScreen('elim');
 }
 
 function checkMrWhiteGuess() {
-  const g = document.getElementById('mrwhite-guess-input').value.trim().toLowerCase();
-  if (!g) return;
-  if (g === ST.secretWord.toLowerCase()) {
+  const guess = document.getElementById('mrwhite-guess-input').value.trim();
+  if (!guess) {
+    toast('Scrivi una parola, oppure rinuncia.');
+    return;
+  }
+  if (normalizeWord(guess) === normalizeWord(ST.secretWord)) {
     showResult('mrwhite-win');
   } else {
     checkWin();
@@ -1032,15 +1297,16 @@ function mrwhiteGiveUp() {
 
 function checkWin() {
   const alive = ST.players.filter(p => !p.eliminated);
-  const aI = alive.filter(p => p.role === 'impostor');
-  const aMW = alive.filter(p => p.role === 'mrwhite');
-  const aC = alive.filter(p => p.role === 'civilian');
-  if (aI.length === 0 && aMW.length === 0) {
+  const aI = alive.filter(p => p.role === 'impostor').length;
+  const aMW = alive.filter(p => p.role === 'mrwhite').length;
+  const aC = alive.filter(p => p.role === 'civilian').length;
+  if (aI === 0 && aMW === 0) {
     showResult('civilians');
     return;
   }
-  if (aI.length >= aC.length) {
-    showResult('impostors');
+  // Mr. White sta dalla parte degli infiltrati: conta per la parità.
+  if (aI + aMW >= aC) {
+    showResult(aI === 0 ? 'mrwhite-survived' : 'impostors');
     return;
   }
   showVoteScreen();
@@ -1059,9 +1325,11 @@ function buildRoleSummaryRows() {
 function showResult(outcome) {
   let emoji, title, sub;
   if (outcome === 'civilians') {
-    emoji = '🎉'; title = 'I civili vincono!'; sub = 'Avete smascherato tutti gli impostori!';
+    emoji = '🎉'; title = 'I civili vincono!'; sub = 'Avete smascherato tutti gli infiltrati!';
   } else if (outcome === 'impostors') {
     emoji = '😈'; title = 'Gli impostori vincono!'; sub = "Siete stati ingannati. Gli impostori l'hanno spuntata.";
+  } else if (outcome === 'mrwhite-survived') {
+    emoji = '⚪️'; title = 'Mr. White vince!'; sub = 'È rimasto in piedi senza mai essere smascherato.';
   } else {
     emoji = '⚪️'; title = 'Mr. White vince!'; sub = 'Ha indovinato la parola segreta. Genio del bluff!';
   }
@@ -1122,6 +1390,7 @@ document.getElementById('btn-ai-create').onclick = createPacketFromAIResponse;
 document.getElementById('file-import').onchange = importPackets;
 document.getElementById('btn-theme').onclick = toggleTheme;
 document.getElementById('btn-add-packet').onclick = addCustomPacket;
+document.querySelectorAll('[data-action="exit-game"]').forEach(btn => { btn.onclick = exitGame; });
 
 // Theme
 function isDarkMode() {
@@ -1163,20 +1432,30 @@ document.addEventListener('keydown', e => {
 async function init() {
   const savedNames = localStorage.getItem('imp_names');
   if (savedNames) {
-    try { ST.playerNames = JSON.parse(savedNames); } catch(e) {}
+    try {
+      const parsed = JSON.parse(savedNames);
+      if (Array.isArray(parsed)) ST.playerNames = parsed.map(n => String(n ?? ''));
+    } catch (e) {}
   }
+  loadPrefs();
+  loadUsedWords();
 
   let manifest = DEFAULT_PACKET_FILES;
   try {
     const res = await fetch('data/manifest.json');
-    if (res.ok) manifest = await res.json();
+    if (res.ok) {
+      const parsed = await res.json();
+      if (Array.isArray(parsed) && parsed.length) manifest = parsed;
+    }
   } catch (e) {}
 
   const fetched = (await Promise.all(
     manifest.map(async name => {
       try {
         const res = await fetch('data/' + name + '.json');
-        return res.ok ? await res.json() : null;
+        if (!res.ok) return null;
+        const p = await res.json();
+        return p && p.id && Array.isArray(p.lines) ? p : null;
       } catch (e) {
         return null;
       }
@@ -1187,11 +1466,20 @@ async function init() {
     ...fetched,
     { id: 'custom', label: 'Custom', emoji: '🎲', colorIdx: 7, lines: [] }
   ];
+  defaultPacketIds = new Set(defaults.map(p => safePacketId(p.id)));
   loadPackets(defaults);
-  ST.selectedPackIds.add(packets[0]?.id || 'easy');
+
+  // Tiene solo le selezioni che esistono ancora; se non ne resta nessuna, ne sceglie una.
+  const existing = new Set(packets.map(p => p.id));
+  ST.selectedPackIds = new Set([...ST.selectedPackIds].filter(id => existing.has(id)));
+  if (!ST.selectedPackIds.size && packets.length) {
+    ST.selectedPackIds.add((packets.find(p => p.lines.length) || packets[0]).id);
+  }
+
   updateThemeBtn();
   updateHintsToggle();
-  updateStepperStates();
+  document.getElementById('player-count').textContent = ST.playerCount;
+  clampRoles();
   renderPlayerNames();
   renderHomePills();
 }

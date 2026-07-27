@@ -479,10 +479,54 @@ body.has-bottom-nav {
   background: var(--surface3);
 }
 
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-secondary:disabled:hover {
+  background: var(--surface2);
+}
+
+.btn-primary:disabled:hover {
+  background: var(--accent);
+}
+
 .btn-group {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 16px);
+  max-width: min(440px, calc(100vw - 32px));
+  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: var(--radius-sm);
+  background: var(--text);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 200;
+}
+
+body.has-bottom-nav .toast {
+  bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .start-row {
@@ -512,6 +556,46 @@ body.has-bottom-nav {
 }
 
 /* Progress Bar */
+.game-top-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  flex-shrink: 0;
+  margin-bottom: var(--spacing-xl);
+}
+
+.game-top-row .progress-bar {
+  margin-bottom: 0;
+}
+
+.game-exit-btn {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.game-exit-btn:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.game-exit-btn:active {
+  transform: scale(0.94);
+}
+
 .progress-bar {
   height: 5px;
   background: var(--surface3);
@@ -737,19 +821,19 @@ body.has-bottom-nav {
   width: 100%;
 }
 
-/* Civilian Eliminated */
-.screen#screen-civilian-elim {
+/* Eliminated */
+.screen#screen-elim {
   display: none;
   flex-direction: column;
   justify-content: center;
   align-items: center;
 }
 
-.screen#screen-civilian-elim.active {
+.screen#screen-elim.active {
   display: flex;
 }
 
-.civ-elim-card {
+.elim-card {
   background: var(--surface);
   border-radius: var(--radius);
   padding: var(--spacing-4xl) var(--spacing-2xl);
@@ -758,6 +842,37 @@ body.has-bottom-nav {
   border: 1px solid var(--border);
   animation: cardEnter 0.34s cubic-bezier(0.2, 0.8, 0.2, 1);
   width: 100%;
+}
+
+.elim-emoji {
+  font-size: 64px;
+  margin-bottom: var(--spacing-lg);
+}
+
+.elim-name {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: var(--spacing-md);
+}
+
+.elim-role {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: var(--spacing-lg);
+}
+
+.elim-role.civilian {
+  color: var(--success);
+}
+
+.elim-role.impostor {
+  color: var(--danger);
+}
+
+.elim-sub {
+  font-size: 15px;
+  color: var(--text2);
+  line-height: 1.5;
 }
 
 /* Mr White Guess Screen */
@@ -1513,7 +1628,7 @@ body.has-bottom-nav {
 #screen-reveal.active,
 #screen-starter.active,
 #screen-vote.active,
-#screen-civilian-elim.active,
+#screen-elim.active,
 #screen-mrwhite-guess.active,
 #screen-result.active,
 #screen-role-summary.active {
