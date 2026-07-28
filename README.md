@@ -28,10 +28,11 @@ dopo la prima apertura, si installa sulla home del telefono e porta con sé
   trascinano per cambiare ordine e si rimuovono singolarmente. *Aggiungi
   giocatore* ne infila uno nuovo, e l'Invio sull'ultimo nome fa lo stesso senza
   staccare le mani dalla tastiera.
-- **Indizi obliqui, non definizioni** — ogni impostore riceve **un solo** indizio,
-  scritto per dare una direzione senza consegnare la risposta: *Pizza* non dà
-  «mozzarella» ma «arriva a domicilio». Ogni voce ne ha quattro e l'ordine è
-  mescolato a ogni parola, quindi con un solo impostore non esce sempre lo stesso.
+- **Indizi di una parola, obliqui** — ogni impostore riceve **un solo** indizio,
+  lungo una parola o al massimo due, scelto per dare una direzione senza
+  consegnare la risposta: *Pizza* non dà «mozzarella» ma «domicilio». Ogni voce ne
+  ha quattro e l'ordine è mescolato a ogni parola, quindi con un solo impostore
+  non esce sempre lo stesso.
 - **Niente parole ripetute** — una parola già uscita non torna finché il
   pacchetto non è esaurito, per tutta la durata della serata.
 - **Cambio parola** — se chi apre la discussione non conosce la parola può
@@ -127,15 +128,15 @@ ciascun impostore.
 
 ### Come è scritto un indizio
 
-Un impostore vede un indizio alla volta, quindi ognuno preso **da solo** deve
-bastare a dire qualcosa di sensato senza far capire la parola. La regola è:
-niente attributi che la definiscono, niente nomi propri che la identificano;
-meglio il contesto attorno — quando succede, cosa ti fa provare, con cosa la si
+Due vincoli insieme. **Una parola, al massimo due** — 4538 indizi su 5540 sono di
+una parola sola. E **niente definizioni**: non l'attributo che identifica la
+parola, ma il contesto attorno — quando succede, cosa provoca, con cosa la si
 confonde.
 
 ```
-Pizza,si divide in fette,il venerdì sera,arriva a domicilio,ognuno la vuole a modo suo
-Titanic,sai già come finisce,ha fatto piangere una generazione,si discute ancora su un dettaglio finale,lunghissimo
+Pizza,domicilio,venerdì,spicchi,condivisa
+Titanic,finale noto,pianto collettivo,lunghissimo,dettaglio discusso
+Bias di conferma,conferme,scartare,inconsapevole,social
 ```
 
 Un buon indizio dovrebbe poter valere anche per due o tre parole diverse. Se
