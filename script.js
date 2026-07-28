@@ -42,7 +42,6 @@ const ICONS = {
   refresh: '<path d="M3 12a9 9 0 0 1 15.2-6.5L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.2 6.5L3 16"/><path d="M3 21v-5h5"/>',
   logOut: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
   arrowRight: '<path d="M5 12h14m-6-7 7 7-7 7"/>',
-  help: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
   trash: '<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>'
 };
 
@@ -215,7 +214,6 @@ function loadPrefs() {
     if (Number.isFinite(raw.impostorCount)) ST.impostorCount = Math.max(0, raw.impostorCount);
     if (Number.isFinite(raw.mrWhiteCount)) ST.mrWhiteCount = Math.max(0, raw.mrWhiteCount);
     if (typeof raw.hintsEnabled === 'boolean') ST.hintsEnabled = raw.hintsEnabled;
-    if (raw.mode === 'twin' || raw.mode === 'hints') ST.mode = raw.mode;
     if (Array.isArray(raw.selectedPackIds)) ST.selectedPackIds = new Set(raw.selectedPackIds);
   } catch (e) {}
 }
@@ -226,7 +224,6 @@ function savePrefs() {
     impostorCount: ST.impostorCount,
     mrWhiteCount: ST.mrWhiteCount,
     hintsEnabled: ST.hintsEnabled,
-    mode: ST.mode,
     selectedPackIds: [...ST.selectedPackIds]
   }));
 }
@@ -249,8 +246,6 @@ const ST = {
   impostorCount: 1,
   mrWhiteCount: 0,
   hintsEnabled: true,
-  mode: 'hints',
-  secretTwin: '',
   selectedPackIds: new Set(),
   players: [],
   currentPlayerIndex: 0,
@@ -397,9 +392,7 @@ function saveGame() {
       impostorCount: ST.impostorCount,
       mrWhiteCount: ST.mrWhiteCount,
       hintsEnabled: ST.hintsEnabled,
-      mode: ST.mode,
       secretWord: ST.secretWord,
-      secretTwin: ST.secretTwin,
       secretWordHints: ST.secretWordHints,
       hintOrder: ST.hintOrder,
       players: ST.players,
@@ -435,9 +428,7 @@ function resumeGame() {
   ST.impostorCount = Number(g.impostorCount) || 0;
   ST.mrWhiteCount = Number(g.mrWhiteCount) || 0;
   ST.hintsEnabled = g.hintsEnabled !== false;
-  ST.mode = g.mode === 'twin' ? 'twin' : 'hints';
   ST.secretWord = String(g.secretWord || '');
-  ST.secretTwin = String(g.secretTwin || '');
   ST.secretWordHints = Array.isArray(g.secretWordHints) ? g.secretWordHints : [];
   ST.hintOrder = Array.isArray(g.hintOrder) ? g.hintOrder : [];
   ST.players = g.players.map(p => ({
@@ -788,32 +779,6 @@ function updateHintsToggle() {
   toggle.setAttribute('aria-checked', String(ST.hintsEnabled));
 }
 
-function setMode(mode) {
-  ST.mode = mode === 'twin' ? 'twin' : 'hints';
-  updateModeUI();
-  savePrefs();
-}
-
-function updateModeUI() {
-  document.querySelectorAll('#mode-select .seg-btn').forEach(btn => {
-    const on = btn.dataset.mode === ST.mode;
-    btn.classList.toggle('active', on);
-    btn.setAttribute('aria-checked', String(on));
-  });
-  const twin = ST.mode === 'twin';
-  document.getElementById('hints-row').hidden = twin;
-  const note = document.getElementById('mode-note');
-  if (twin) {
-    const pairs = buildWordPool({ requireTwin: true }).length;
-    note.textContent = pairs
-      ? `Civili e impostori ricevono parole diverse ma vicine, e nessuno sa quale ha. ${pairs} coppie nei pacchetti scelti.`
-      : 'Nessuna coppia nei pacchetti scelti: scegline altri o torna alla modalità Indizio.';
-    note.classList.toggle('warn', !pairs);
-  } else {
-    note.textContent = 'Gli impostori non ricevono la parola e sanno di essere impostori.';
-    note.classList.remove('warn');
-  }
-}
 
 function updateStepperStates() {
   const maxRoles = ST.playerCount - 1;
@@ -848,7 +813,6 @@ function renderHomePills() {
     btn.onclick = () => toggleHomePack(p.id);
     g.appendChild(btn);
   });
-  updateModeUI();
 }
 
 function renderResumeBanner() {
@@ -1500,22 +1464,13 @@ function importPackets(e) {
 }
 
 // Game Logic
-// Formato riga: "parola,indizio,indizio" oppure "parola|parola simile,indizio,indizio".
-// La parola dopo la barra è quella che ricevono gli impostori in modalità gemella.
 function parseLine(l) {
   const pts = l.split(',').map(s => s.trim());
-  const head = pts[0] || '';
-  const sep = head.indexOf('|');
-  return {
-    word: (sep === -1 ? head : head.slice(0, sep)).trim(),
-    twin: sep === -1 ? '' : head.slice(sep + 1).trim(),
-    hints: pts.slice(1).filter(Boolean)
-  };
+  return { word: pts[0] || '', hints: pts.slice(1).filter(Boolean) };
 }
 
 // Unisce i pacchetti selezionati, scartando righe vuote e parole doppie tra pacchetti.
-// In modalità gemella restano solo le voci che hanno una parola simile.
-function buildWordPool({ requireTwin = ST.mode === 'twin' } = {}) {
+function buildWordPool() {
   const pool = [];
   const seen = new Set();
   for (const id of ST.selectedPackIds) {
@@ -1525,7 +1480,6 @@ function buildWordPool({ requireTwin = ST.mode === 'twin' } = {}) {
       const entry = parseLine(line);
       const key = normalizeWord(entry.word);
       if (!key || seen.has(key)) continue;
-      if (requireTwin && !entry.twin) continue;
       seen.add(key);
       entry.pack = p.label;
       pool.push(entry);
@@ -1537,9 +1491,7 @@ function buildWordPool({ requireTwin = ST.mode === 'twin' } = {}) {
 function pickWord({ exclude = null } = {}) {
   const pool = buildWordPool();
   if (!pool.length) {
-    alert(ST.mode === 'twin'
-      ? 'Nessuna coppia di parole simili nei pacchetti scelti. Scegline altri o passa alla modalità Indizio.'
-      : 'Nessuna parola disponibile! Controlla i pacchetti selezionati.');
+    alert('Nessuna parola disponibile! Controlla i pacchetti selezionati.');
     return false;
   }
 
@@ -1558,7 +1510,6 @@ function pickWord({ exclude = null } = {}) {
 
   const e = available[Math.floor(Math.random() * available.length)];
   ST.secretWord = e.word;
-  ST.secretTwin = e.twin || '';
   ST.secretWordHints = e.hints;
   ST.hintOrder = shuffle(e.hints.map((_, i) => i));
   ST.usedWords.add(normalizeWord(e.word));
@@ -1700,14 +1651,7 @@ function revealRole() {
   const p = ST.players[idx];
   const pct = playerPct();
   let html = `<div class="player-number">${escapeHTML(p.name)}</div>`;
-  // In modalità gemella civili e impostori vedono esattamente la stessa schermata:
-  // nessuno dei due sa da che parte sta, ed è tutto il gusto del gioco.
-  if (ST.mode === 'twin' && p.role !== 'mrwhite') {
-    const word = p.role === 'impostor' ? (ST.secretTwin || ST.secretWord) : ST.secretWord;
-    html += `<div class="role-icon neutral">${icon('help')}</div><div class="role-badge neutral">La tua parola</div>`
-      + `<div class="role-word">${escapeHTML(word)}</div>`
-      + `<p class="role-sub">Non sai se è la parola di tutti. Descrivila senza dirla e ascolta chi stona.</p>`;
-  } else if (p.role === 'civilian') {
+  if (p.role === 'civilian') {
     html += `<div class="role-icon civilian">🟢</div><div class="role-badge civilian">Civile</div><div class="role-word">${escapeHTML(ST.secretWord)}</div><p class="role-sub">Questa è la tua parola. Difendila senza rivelarla!</p>`;
   } else if (p.role === 'impostor') {
     html += `<div class="role-icon impostor">🔴</div><div class="role-badge impostor">Impostore</div><div class="role-word">???</div><p class="role-sub">Non conosci la parola. Fingila bene!</p>`;
@@ -1867,11 +1811,8 @@ function buildRoleSummaryRows() {
   const iN = ST.players.filter(p => p.role === 'impostor').map(p => p.name).join(', ');
   const mwN = ST.players.filter(p => p.role === 'mrwhite').map(p => p.name).join(', ');
 
-  let infoRows = ST.mode === 'twin' && ST.secretTwin
-    ? `<div class="info-row"><span>Parola dei civili</span><span><strong>${escapeHTML(ST.secretWord)}</strong></span></div>
-       <div class="info-row"><span>Parola degli impostori</span><span><strong>${escapeHTML(ST.secretTwin)}</strong></span></div>`
-    : `<div class="info-row"><span>Parola segreta</span><span><strong>${escapeHTML(ST.secretWord)}</strong></span></div>`;
-  infoRows += `<div class="info-row"><span>Impostori</span><span class="tag-i">${escapeHTML(iN || '—')}</span></div>`;
+  let infoRows = `<div class="info-row"><span>Parola segreta</span><span><strong>${escapeHTML(ST.secretWord)}</strong></span></div>
+    <div class="info-row"><span>Impostori</span><span class="tag-i">${escapeHTML(iN || '—')}</span></div>`;
   if (mwN) infoRows += `<div class="info-row"><span>Mr. White</span><span class="tag-mw">${escapeHTML(mwN)}</span></div>`;
   return infoRows;
 }
@@ -1985,9 +1926,6 @@ document.getElementById('btn-theme').onclick = toggleTheme;
 document.getElementById('btn-add-packet').onclick = addCustomPacket;
 document.querySelectorAll('[data-action="exit-game"]').forEach(btn => { btn.onclick = exitGame; });
 document.getElementById('btn-add-player').onclick = addPlayer;
-document.querySelectorAll('#mode-select .seg-btn').forEach(btn => {
-  btn.onclick = () => setMode(btn.dataset.mode);
-});
 
 // Theme
 function isDarkMode() {
@@ -2076,7 +2014,6 @@ async function init() {
   renderStaticIcons();
   updateThemeBtn();
   updateHintsToggle();
-  updateModeUI();
   document.getElementById('player-count').textContent = ST.playerCount;
   clampRoles();
   renderPlayerNames();

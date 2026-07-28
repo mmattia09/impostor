@@ -151,8 +151,7 @@ body.has-bottom-nav {
 .pdel,
 .add-packet-btn,
 .add-player-btn,
-.link-btn,
-.seg-btn {
+.link-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -314,65 +313,7 @@ body.has-bottom-nav {
   color: var(--accent);
 }
 
-/* Selettore modalità */
-.mode-block {
-  padding-bottom: var(--spacing-md);
-}
-
-.mode-title {
-  font-size: 15px;
-  font-weight: 500;
-  margin-bottom: var(--spacing-md);
-}
-
-.segmented {
-  display: flex;
-  gap: 3px;
-  padding: 3px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 11px;
-}
-
-.seg-btn {
-  flex: 1;
-  min-width: 0;
-  padding: 9px var(--spacing-sm);
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text2);
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
-  touch-action: manipulation;
-}
-
-.seg-btn.active {
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.mode-note {
-  font-size: 13px;
-  color: var(--text2);
-  line-height: 1.45;
-  margin-top: var(--spacing-md);
-}
-
-.mode-note.warn {
-  color: var(--warning);
-}
-
 /* Toggle */
-.toggle-row[hidden] {
-  display: none;
-}
-
 .toggle-row {
   display: flex;
   align-items: center;
@@ -1124,20 +1065,6 @@ body.has-bottom-nav .toast {
 
 .role-icon.impostor {
   background: var(--danger-soft-strong);
-}
-
-.role-icon.neutral {
-  background: var(--accent-soft-strong);
-  color: var(--accent);
-}
-
-.role-icon.neutral .icon {
-  width: 34px;
-  height: 34px;
-}
-
-.role-badge.neutral {
-  color: var(--accent);
 }
 
 .role-icon.mrwhite {

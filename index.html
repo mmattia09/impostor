@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Impostore</title>
-  <link rel="stylesheet" href="style.css?v=17">
+  <link rel="stylesheet" href="style.css?v=18">
   <script>
     (function() {
       var t = localStorage.getItem('imp_theme') ||
@@ -65,15 +65,7 @@
           </div>
         </div>
         <div class="divider"></div>
-        <div class="mode-block">
-          <h3 class="mode-title">Cosa ricevono gli impostori</h3>
-          <div class="segmented" id="mode-select" role="radiogroup" aria-label="Modalità di gioco">
-            <button class="seg-btn active" type="button" role="radio" aria-checked="true" data-mode="hints">Indizio</button>
-            <button class="seg-btn" type="button" role="radio" aria-checked="false" data-mode="twin">Parola simile</button>
-          </div>
-          <p class="mode-note" id="mode-note"></p>
-        </div>
-        <div class="toggle-row" id="hints-row">
+        <div class="toggle-row">
           <div class="toggle-info">
             <h3>Indizi agli impostori</h3>
             <p>Ogni impostore riceve 1 indizio</p>
@@ -100,8 +92,7 @@
       </div>
       <div class="settings-intro">
         Formato per ogni riga: <code>parola,indizio1,indizio2,...</code><br>
-        Una voce per riga &nbsp;·&nbsp; Indizi opzionali, quanti ne vuoi &nbsp;·&nbsp; Ogni indizio può essere più parole<br>
-        Per la modalità <em>Parola simile</em>: <code>parola|parola simile,indizio1,...</code>
+        Una voce per riga &nbsp;·&nbsp; Indizi opzionali, quanti ne vuoi &nbsp;·&nbsp; Ogni indizio può essere più parole
       </div>
       <div class="sa-row">
         <button class="sa-btn" id="btn-export-all" type="button"><span data-icon="upload"></span> Esporta tutti</button>
@@ -248,6 +239,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="script.js?v=17"></script>
+  <script src="script.js?v=18"></script>
 </body>
 </html>

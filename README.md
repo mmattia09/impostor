@@ -13,16 +13,12 @@ privato, poi si discute e si vota.
 Nato per giocare in gruppo senza scaricare niente e senza account: è una pagina
 statica in HTML, CSS e JavaScript, senza framework né build. Funziona offline
 dopo la prima apertura, si installa sulla home del telefono e porta con sé
-**oltre 1.300 parole** divise in 17 pacchetti, tutti modificabili.
+**1385 parole** divise in 17 pacchetti, tutti modificabili.
 
 > Gioca subito: <https://mmattia09.github.io/impostor/>
 
 ## Funzionalità
 
-- **Due modalità** — *Indizio*: gli impostori sanno di esserlo e ricevono solo un
-  indizio. *Parola simile*: civili e impostori ricevono parole diverse ma vicine
-  (*Cappuccino* contro *Caffè macchiato*) e **nessuno sa da che parte sta** — si
-  tradisce chi resta troppo sul generico. **1224 coppie** già pronte.
 - **Tre ruoli** — civile (conosce la parola), impostore (non la conosce ma riceve
   un indizio), Mr. White (non riceve nulla e, se eliminato, può vincere da solo
   indovinando la parola).
@@ -32,9 +28,10 @@ dopo la prima apertura, si installa sulla home del telefono e porta con sé
   trascinano per cambiare ordine e si rimuovono singolarmente. *Aggiungi
   giocatore* ne infila uno nuovo, e l'Invio sull'ultimo nome fa lo stesso senza
   staccare le mani dalla tastiera.
-- **Indizi diversi per ogni impostore** — ogni voce può avere quanti indizi vuoi,
-  anche di più parole. L'ordine è mescolato a ogni parola, quindi con un solo
-  impostore non esce sempre il primo indizio della riga.
+- **Indizi obliqui, non definizioni** — ogni impostore riceve **un solo** indizio,
+  scritto per dare una direzione senza consegnare la risposta: *Pizza* non dà
+  «mozzarella» ma «arriva a domicilio». Ogni voce ne ha quattro e l'ordine è
+  mescolato a ogni parola, quindi con un solo impostore non esce sempre lo stesso.
 - **Niente parole ripetute** — una parola già uscita non torna finché il
   pacchetto non è esaurito, per tutta la durata della serata.
 - **Cambio parola** — se chi apre la discussione non conosce la parola può
@@ -109,37 +106,40 @@ round; si azzera solo con *Termina serata* o dopo 12 ore di inattività.
 | 📦 Facile | 88 | Parole quotidiane, adatte a tutti e ai bambini |
 | ⚡ Medio | 84 | Vita adulta, burocrazia, situazioni riconoscibili |
 | 🔥 Difficile | 83 | Concetti di filosofia, economia, scienze sociali e bias cognitivi |
-| 🍝 Cibo | 75 | Piatti italiani e cucina del mondo |
+| 🍝 Cibo | 72 | Piatti italiani e cucina del mondo |
 | 🐾 Animali | 76 | Dai grandi mammiferi agli insetti curiosi |
 | 🌍 Luoghi | 74 | Monumenti, città e meraviglie naturali |
 | 🎬 Cinema | 69 | Film che quasi tutti hanno visto |
-| 🎵 Musica | 76 | Artisti, generi e oggetti della musica |
+| 🎵 Musica | 75 | Artisti, generi e oggetti della musica |
 | ⚽ Sport | 74 | Discipline, gesti tecnici e regole |
 | 🔬 Scienza | 75 | Fisica, biologia, astronomia, chimica |
-| 🏛 Mitologia | 74 | Greca, norrena, egizia, giapponese e non solo |
-| 💎 Brand | 114 | Marchi famosi di ogni settore |
-| 🎲 Giochi da tavolo | 78 | Dai classici ai gestionali pesanti |
-| 👾 Video Games | 115 | Titoli iconici di ogni epoca e genere |
+| 🏛 Mitologia | 73 | Greca, norrena, egizia, giapponese e non solo |
+| 💎 Brand | 111 | Marchi famosi di ogni settore |
+| 🎲 Giochi da tavolo | 75 | Dai classici ai gestionali pesanti |
+| 👾 Video Games | 114 | Titoli iconici di ogni epoca e genere |
 | ⛏ Minecraft | 94 | Mob, biomi, blocchi e meccaniche |
 | 🎸 Strumenti | 73 | Strumenti musicali di tutto il mondo |
 | 🗣 Slang | 75 | Gergo di internet e delle nuove generazioni |
 
-La colonna *Voci* conta tutte le parole; l'89% di esse ha anche una parola simile
-per la seconda modalità.
+Ogni riga ha la forma `parola,indizio1,indizio2,...`: il primo campo è la parola
+segreta, gli altri quattro sono gli indizi da cui l'app ne pesca **uno solo** per
+ciascun impostore.
 
-Ogni riga di un pacchetto ha la forma `parola,indizio1,indizio2,...`: il primo
-campo è la parola segreta, tutti gli altri sono indizi distribuiti agli impostori.
+### Come è scritto un indizio
 
-Per la modalità *Parola simile* la riga porta due parole separate da una barra:
+Un impostore vede un indizio alla volta, quindi ognuno preso **da solo** deve
+bastare a dire qualcosa di sensato senza far capire la parola. La regola è:
+niente attributi che la definiscono, niente nomi propri che la identificano;
+meglio il contesto attorno — quando succede, cosa ti fa provare, con cosa la si
+confonde.
 
 ```
-Cappuccino|Caffè macchiato,schiuma,mattina,bar
-Ossobuco|Stinco,midollo,gremolada,cottura lenta
+Pizza,si divide in fette,il venerdì sera,arriva a domicilio,ognuno la vuole a modo suo
+Titanic,sai già come finisce,ha fatto piangere una generazione,si discute ancora su un dettaglio finale,lunghissimo
 ```
 
-Prima della barra la parola dei civili, dopo quella degli impostori; gli indizi
-restano e servono all'altra modalità. Una riga senza barra funziona come sempre,
-ma non viene estratta in modalità *Parola simile*.
+Un buon indizio dovrebbe poter valere anche per due o tre parole diverse. Se
+leggendolo indovini subito, è da riscrivere.
 
 ## Interfaccia
 
@@ -179,9 +179,8 @@ Per aggiungerne uno di serie al repository:
      "emoji": "🎯",
      "colorIdx": 3,
      "lines": [
-       "parola,indizio1,indizio2 di più parole,indizio3",
-       "parola|parola simile,indizio1,indizio2",
-       "altra parola,solo un indizio"
+       "parola,indizio,indizio di più parole,altro indizio",
+       "altra parola,uno,due,tre"
      ]
    }
    ```
