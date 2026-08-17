@@ -13,7 +13,7 @@ privato, poi si discute e si vota.
 Nato per giocare in gruppo senza scaricare niente e senza account: è una pagina
 statica in HTML, CSS e JavaScript, senza framework né build. Funziona offline
 dopo la prima apertura, si installa sulla home del telefono e porta con sé
-**1385 parole** divise in 17 pacchetti, tutti modificabili.
+**1476 parole** divise in 17 pacchetti, tutti modificabili.
 
 > Gioca subito: <https://mmattia09.github.io/impostor/>
 
@@ -42,7 +42,9 @@ dopo la prima apertura, si installa sulla home del telefono e porta con sé
   una ✕ per annullare il round, e dalla votazione si può chiudere la partita
   mostrando tutti i ruoli.
 - **Punteggi che si accumulano** — ogni round assegna punti e la classifica
-  della serata resta in home fino a quando non la azzeri.
+  della serata resta in home fino a quando non la azzeri. Dopo la prima
+  eliminazione si può anche **chiudere il round a metà**, invece di trascinare
+  votazioni di cui tutti conoscono già l'esito.
 - **A prova di refresh** — punteggi, cronologia e round in corso vivono sul
   dispositivo: se ricarichi la pagina per sbaglio, in home trovi *Riprendi* e la
   partita torna esattamente dov'era, con gli stessi ruoli.
@@ -94,7 +96,14 @@ A fine round i punti si assegnano così:
 | Vincono gli impostori | **+3** a ogni impostore, **+1** a un Mr. White ancora vivo |
 | Mr. White indovina la parola | **+4** a Mr. White |
 | Mr. White resta in piedi fino alla parità | **+4** a Mr. White |
+| Round chiuso a metà | **+1** a ogni civile per ogni infiltrato scoperto, **+2** a chi non è stato smascherato |
 | Partita chiusa con *Mostra ruoli ed esci* | nessun punto |
+
+**Chiudi qui il round.** Quando restano solo Mr. White o l'ultimo impostore, spesso
+tutti hanno già capito chi è e continuare a votare è tempo perso. Dopo la prima
+eliminazione compare un pulsante che chiude il round e conta i punti per quello
+che è stato scoperto fin lì: chi è stato beccato non prende niente, chi è rimasto
+nascosto porta a casa **+2**.
 
 I punti sono legati al **nome** del giocatore, quindi restano suoi anche se
 cambia posto nel giro. La classifica compare in home e sulla schermata di fine
@@ -105,7 +114,7 @@ round; si azzera solo con *Termina serata* o dopo 12 ore di inattività.
 | Pacchetto | Voci | Contenuto |
 |-----------|-----:|-----------|
 | 📦 Facile | 88 | Parole quotidiane, adatte a tutti e ai bambini |
-| ⚡ Medio | 84 | Vita adulta, burocrazia, situazioni riconoscibili |
+| ⚡ Medio | 175 | Vita adulta, burocrazia, situazioni riconoscibili |
 | 🔥 Difficile | 83 | Concetti di filosofia, economia, scienze sociali e bias cognitivi |
 | 🍝 Cibo | 72 | Piatti italiani e cucina del mondo |
 | 🐾 Animali | 76 | Dai grandi mammiferi agli insetti curiosi |

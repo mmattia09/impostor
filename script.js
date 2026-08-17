@@ -40,6 +40,7 @@ const ICONS = {
   check: '<path d="m20 6-11 11-5-5"/>',
   userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6m3-3h-6"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 15.2-6.5L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.2 6.5L3 16"/><path d="M3 21v-5h5"/>',
+  flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1Z"/><path d="M4 22v-7"/>',
   logOut: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
   arrowRight: '<path d="M5 12h14m-6-7 7 7-7 7"/>',
   trash: '<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>'
@@ -355,9 +356,14 @@ function awardPoints(outcome) {
   ST.scored = true;
   const rules = SCORE_TABLE[outcome] || {};
   const gains = [];
+  // Round chiuso a metà: i civili prendono un punto per ogni infiltrato
+  // scoperto, chi non è stato smascherato ne prende due.
+  const scoperti = outcome === 'early' ? infiltratiScoperti().scoperti : 0;
   ST.players.forEach(p => {
     let pts = 0;
-    if (p.role === 'civilian') pts = rules.civilian || 0;
+    if (outcome === 'early') {
+      pts = p.role === 'civilian' ? scoperti : (p.eliminated ? 0 : 2);
+    } else if (p.role === 'civilian') pts = rules.civilian || 0;
     else if (p.role === 'impostor') pts = rules.impostor || 0;
     else if (p.role === 'mrwhite') pts = (rules.mrwhite || 0) + (p.eliminated ? 0 : (rules.mrwhiteAlive || 0));
     if (!pts) return;
@@ -504,6 +510,7 @@ function updateBottomNav(screenId) {
     group.className = 'btn-group';
     group.innerHTML = `
       <button class="btn btn-primary" id="btn-confirm-vote">Conferma eliminazione</button>
+      ${canEndRoundEarly() ? `<button class="btn btn-secondary" id="btn-end-round">${icon('flag', 'icon-sm')} Chiudi qui il round</button>` : ''}
       <button class="btn btn-secondary" id="btn-show-roles-exit">${icon('logOut', 'icon-sm')} Mostra ruoli ed esci</button>
     `;
     nav.appendChild(group);
@@ -518,11 +525,13 @@ function updateBottomNav(screenId) {
     nav.appendChild(group);
     document.getElementById('bottom-nav').classList.add('active');
   } else if (screenId === 'elim') {
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-primary';
-    btn.innerHTML = 'Continua il gioco ' + icon('arrowRight', 'icon-sm');
-    btn.id = 'btn-continue-elim';
-    nav.appendChild(btn);
+    const group = document.createElement('div');
+    group.className = 'btn-group';
+    group.innerHTML = `
+      <button class="btn btn-primary" id="btn-continue-elim">Continua il gioco ${icon('arrowRight', 'icon-sm')}</button>
+      ${canEndRoundEarly() ? `<button class="btn btn-secondary" id="btn-end-round">${icon('flag', 'icon-sm')} Chiudi qui il round</button>` : ''}
+    `;
+    nav.appendChild(group);
     document.getElementById('bottom-nav').classList.add('active');
   } else if (screenId === 'mrwhite-guess') {
     const group = document.createElement('div');
@@ -557,6 +566,15 @@ function updateBottomNav(screenId) {
     document.getElementById('bottom-nav').classList.contains('active'));
 
   attachBottomNavListeners();
+  syncBottomNavSpace();
+}
+
+// Con tre pulsanti la barra è più alta: lo spazio sotto va misurato, non indovinato.
+function syncBottomNavSpace() {
+  const nav = document.getElementById('bottom-nav');
+  document.body.style.paddingBottom = nav.classList.contains('active')
+    ? `calc(${nav.offsetHeight + 24}px + env(safe-area-inset-bottom, 0px))`
+    : '';
 }
 
 function attachBottomNavListeners() {
@@ -567,6 +585,7 @@ function attachBottomNavListeners() {
     'btn-show-roles-exit': showRolesAndExit,
     'btn-confirm-vote': confirmVote,
     'btn-continue-elim': checkWin,
+    'btn-end-round': endRoundEarly,
     'btn-change-word': changeWord,
     'btn-mrwhite-confirm': checkMrWhiteGuess,
     'btn-mrwhite-giveup': mrwhiteGiveUp,
@@ -875,6 +894,7 @@ const HISTORY_LABELS = {
   impostors: { text: 'impostori', cls: 'bad' },
   'mrwhite-win': { text: 'Mr. White', cls: 'mw' },
   'mrwhite-survived': { text: 'Mr. White', cls: 'mw' },
+  early: { text: 'chiuso a metà', cls: 'muted' },
   cambiata: { text: 'cambiata', cls: 'muted' },
   annullata: { text: 'annullata', cls: 'muted' }
 };
@@ -1607,6 +1627,29 @@ function changeWord() {
   toast('Nuova parola estratta: ripassate il telefono a tutti.');
 }
 
+// Dopo la prima eliminazione i ruoli sono spesso già chiari: si può chiudere
+// il round e prendere i punti per gli infiltrati scoperti fin lì.
+function canEndRoundEarly() {
+  return ST.players.some(p => p.eliminated) && !ST.scored;
+}
+
+function infiltratiScoperti() {
+  const infiltrati = ST.players.filter(p => p.role !== 'civilian');
+  return { totale: infiltrati.length, scoperti: infiltrati.filter(p => p.eliminated).length };
+}
+
+function endRoundEarly() {
+  if (!canEndRoundEarly()) return;
+  const { totale, scoperti } = infiltratiScoperti();
+  const restanti = totale - scoperti;
+  const msg = restanti === 1
+    ? 'Chiudere il round? Resta un infiltrato non scoperto: si contano i punti fin qui.'
+    : `Chiudere il round? Restano ${restanti} infiltrati non scoperti: si contano i punti fin qui.`;
+  if (!confirm(msg)) return;
+  stopWordChangeTicker();
+  showResult('early');
+}
+
 function exitGame() {
   if (!confirm('Uscire dalla partita? Il round in corso viene annullato.')) return;
   stopWordChangeTicker();
@@ -1823,6 +1866,12 @@ function showResult(outcome) {
     emoji = '🎉'; title = 'I civili vincono!'; sub = 'Avete smascherato tutti gli infiltrati!';
   } else if (outcome === 'impostors') {
     emoji = '😈'; title = 'Gli impostori vincono!'; sub = "Siete stati ingannati. Gli impostori l'hanno spuntata.";
+  } else if (outcome === 'early') {
+    const { totale, scoperti } = infiltratiScoperti();
+    emoji = '🏁'; title = 'Round chiuso';
+    sub = scoperti === 1
+      ? `1 infiltrato su ${totale} scoperto prima di chiudere.`
+      : `${scoperti} infiltrati su ${totale} scoperti prima di chiudere.`;
   } else if (outcome === 'mrwhite-survived') {
     emoji = '⚪️'; title = 'Mr. White vince!'; sub = 'È rimasto in piedi senza mai essere smascherato.';
   } else {
